@@ -473,7 +473,7 @@ sup a {{ text-decoration:none; }}
 
 <h2>Hypotheses</h2>
 <ol class="hyp">
-  <li><b>Free CRM is cannibalizing Starter and Pro (SKU mix shift).</b> People who used to start a paid trial now pick the free plan, which converts much less. <span class="verdict">Supported</span></li>
+  <li><b>Free CRM is cannibalizing Starter and Pro (SKU mix shift).</b> People who used to start a Pro or Starter trial now get Free CRM, which converts much less. <span class="verdict">Supported</span></li>
   <li><b>Signup quality deteriorated (top of funnel).</b> Traffic nearly doubled, mostly from Display. If the new traffic brought lower-intent signups, conversion would fall regardless of plan. <span class="verdict">Not supported</span></li>
 </ol>
 
