@@ -40,6 +40,9 @@ kd = {(s, p): w for s, p, w in kit}
 mix_total = sum(w for s, p, w in kit if s == "Mix effect")
 rate_total = sum(w for s, p, w in kit if s == "Rate effect")
 
+n_sessions = q('SELECT COUNT(*) FROM sessions_clean')[0][0]
+n_signups = q('SELECT COUNT(*) FROM signups_clean')[0][0]
+n_opps, opp_end = q('SELECT COUNT(*), MAX(close_dt) FROM opportunities_clean')[0]
 sess_q = {r[0]: r[1] for r in q("""SELECT CASE WHEN event_dt < DATE '2026-04-01' THEN 'Q1' ELSE 'Q2' END, COUNT(*)/3.0
                                    FROM sessions_clean GROUP BY 1""")}
 
@@ -187,7 +190,7 @@ def waterfall(title_id):
         ("Mix: fewer Starter trials", kd[("Mix effect", "Starter")], "delta"),
         ("Mix: fewer Pro trials", kd[("Mix effect", "Pro")], "delta"),
         ("Mix: Free CRM upgrades", kd[("Mix effect", "Free CRM")], "delta"),
-        ("Conversion within each plan", rate_total, "delta"),
+        ("Conversion within each SKU", rate_total, "delta"),
         ("Q2 wins / month", kd[("Q2 wins / month", None)], "total"),
     ]
     H, L, R, T, B = 300, 44, 16, 24, 64
@@ -301,7 +304,7 @@ ch_water = waterfall("c4t")
 ch_dumb = dumbbell("c5t")
 ch_be = hbars("c6t", [("Free CRM today (30-day)", free_cr, "--s3"),
                       ("Needed to replace lost wins", be_wins, "--ink-total"),
-                      ("Needed to replace lost MRR", be_mrr, "--ink-total"),
+                      ("Needed to replace lost deal value", be_mrr, "--ink-total"),
                       ("Starter / Pro trials (Q2)", pp[("Q2", "Starter")][1], "--s1")], 30)
 
 # ------------------------------------------------------------------ tables
@@ -310,7 +313,7 @@ def table(head, rows, cls=""):
     b = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
     return f'<div class="tbl"><table class="{cls}"><thead><tr>{h}</tr></thead><tbody>{b}</tbody></table></div>'
 
-t_funnel = table(["Signup month", "Sessions", "Signups", "Paid (30d)", "New MRR (30d)", "Session → signup", "Signup → paid", "Session → paid"],
+t_funnel = table(["Signup month", "Sessions", "Signups", "Paid (30d)", "New deal value (30d)", "Session → signup", "Signup → paid", "Session → paid"],
                  [[MONTHS[i], f0(r[0]), f0(r[1]), f0(r[2]), "$" + f0(r[3]), f"{r[4]:.2f}%", f"{r[5]:.1f}%", f"{r[6]:.2f}%"] for i, r in enumerate(funnel)], "num")
 
 def prow(p):
@@ -318,7 +321,7 @@ def prow(p):
     mixa = 100 * a[0] / n1 if a else 0; mixb = 100 * b[0] / n2
     return [f'<i class="sw" style="background:var({PC[p]})"></i>{p}', f0(a[0]) if a else "—", f0(b[0]),
             pct(mixa) if a else "—", pct(mixb), f"{a[1]:.1f}%" if a else "—", f"{b[1]:.1f}%", f0(a[2]) if a else "—", f0(b[2])]
-t_prod = table(["Plan", "Signups/mo Q1", "Signups/mo Q2", "Mix Q1", "Mix Q2", "Conv. Q1", "Conv. Q2", "Paid/mo Q1", "Paid/mo Q2"],
+t_prod = table(["SKU", "Signups/mo Q1", "Signups/mo Q2", "Mix Q1", "Mix Q2", "Conv. Q1", "Conv. Q2", "Paid/mo Q1", "Paid/mo Q2"],
                [prow(p) for p in PRODUCTS] + [["<b>All signups</b>", f0(n1), f0(n2), "100%", "100%", f"<b>{cr1:.1f}%</b>", f"<b>{cr2:.1f}%</b>", f"<b>{f0(w1)}</b>", f"<b>{f0(w2)}</b>"]], "num")
 
 t_kit = table(["Step", "Wins / month", "What it means"], [
@@ -328,7 +331,7 @@ t_kit = table(["Step", "Wins / month", "What it means"], [
     ["&nbsp;&nbsp;↳ Starter", f1(kd[("Mix effect", "Starter")]), ""],
     ["&nbsp;&nbsp;↳ Pro", f1(kd[("Mix effect", "Pro")]), ""],
     ["&nbsp;&nbsp;↳ Free CRM", f"+{f1(kd[('Mix effect', 'Free CRM')])}", ""],
-    ["Rate effect", f1(rate_total), "Change in conversion inside each plan"],
+    ["Rate effect", f1(rate_total), "Change in conversion inside each SKU"],
     ["&nbsp;&nbsp;↳ Starter", f"+{f1(kd[('Rate effect', 'Starter')])}", ""],
     ["&nbsp;&nbsp;↳ Pro", f1(kd[("Rate effect", "Pro")]), ""],
     ["Q2", f1(kd[("Q2 wins / month", None)]), "Average paying customers per month, Apr–Jun"],
@@ -348,7 +351,7 @@ def slice_tables():
         out.append(f"<h4>{d}</h4>" + table([d] + MONTHS + ["Q1", "Q2", "Δ pp", "Free share Q2", "Signups/mo"], rows, "num"))
     return "".join(out)
 
-t_fin = table(["Close month", "Paying customers", "All closed opps (incl. $0)", "New MRR"],
+t_fin = table(["Close month", "Paying customers", "All closed opps (incl. $0)", "New deal value"],
               [[m, f0(p), f0(a), "$" + f0(mr)] for m, p, a, mr in fin])
 
 WIN_SQL = "-- ANALYSIS BASE" + Path("sql/01_clean.sql").read_text().split("-- ANALYSIS BASE")[1]
@@ -400,6 +403,7 @@ p, li {{ max-width:80ch; }}
 .tile {{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }}
 .tile .l {{ font-size:13px; color:var(--fg2); }}
 .tile .v {{ font-size:24px; font-weight:600; margin-top:4px; }}
+.tile .v .q {{ font-size:15px; font-weight:500; color:var(--fg2); }}
 .tile .d {{ font-size:13px; color:var(--fg2); margin-top:2px; }}
 @media (max-width:640px) {{ .tiles {{ grid-template-columns:repeat(2,1fr); }} }}
 .callout {{ background:var(--callout); border-radius:10px; padding:14px 18px; margin:24px 0; font-size:15px; }}
@@ -452,34 +456,33 @@ sup a {{ text-decoration:none; }}
 <h1>Why paying customers dropped while signups grew</h1>
 <div class="date">Northwind CRM · Self-serve funnel · Data Jan 1 – Jun 30, 2026</div>
 
-<p class="tldr">Paying customers dropped {100*(1-w2/w1):.0f}% after Free CRM launched ({f0(w1)} → {f0(w2)} per month), even though signups grew {100*(n2/n1-1):.0f}%. Conversion inside each paid trial didn't change. What changed is which plan people sign up for: Free CRM became the main CTA on Apr 1 and now takes {pct(100*free_n/n2)} of signups, but only {free_cr:.1f}% of them become paying customers, vs ~{pp[("Q2","Starter")][1]:.0f}% for Starter and Pro trials. The plan mix explains the full drop.</p>
+<p class="tldr">Paying customers dropped {100*(1-w2/w1):.0f}% after Free CRM launched ({f0(w1)} → {f0(w2)} per month), even though signups grew {100*(n2/n1-1):.0f}%. Signup-to-paid conversion by SKU didn't change. What changed is the SKU mix: Free CRM became the primary call-to-action across the site on Apr 1 and now takes {pct(100*free_n/n2)} of signups, but only {free_cr:.1f}% of them become paying customers, vs ~{pp[("Q2","Starter")][1]:.0f}% for Starter and Pro trials. The shift in SKU mix accounts for the drop.</p>
 
 <div class="tiles">
-  <div class="tile"><div class="l">Paying customers / month</div><div class="v">{f0(w2)}</div><div class="d">from {f0(w1)} · {100*(w2/w1-1):+.0f}%</div></div>
-  <div class="tile"><div class="l">Signups / month</div><div class="v">{f0(n2)}</div><div class="d">from {f0(n1)} · {100*(n2/n1-1):+.0f}%</div></div>
-  <div class="tile"><div class="l">Signup → paid</div><div class="v">{cr2:.1f}%</div><div class="d">from {cr1:.1f}%</div></div>
-  <div class="tile"><div class="l">New MRR / month</div><div class="v">${mrr2/1000:.1f}K</div><div class="d">from ${mrr1/1000:.1f}K · {100*(mrr2/mrr1-1):+.0f}%</div></div>
+  <div class="tile"><div class="l">Paying customers / month</div><div class="v"><span class="q">Q2:</span> {f0(w2)}</div><div class="d">Q1: {f0(w1)} · QoQ {100*(w2/w1-1):+.0f}%</div></div>
+  <div class="tile"><div class="l">Signups / month</div><div class="v"><span class="q">Q2:</span> {f0(n2)}</div><div class="d">Q1: {f0(n1)} · QoQ {100*(n2/n1-1):+.0f}%</div></div>
+  <div class="tile"><div class="l">Signup → paid</div><div class="v"><span class="q">Q2:</span> {cr2:.1f}%</div><div class="d">Q1: {cr1:.1f}% · QoQ {cr2-cr1:+.1f}pp</div></div>
+  <div class="tile"><div class="l">New deal value / month</div><div class="v"><span class="q">Q2:</span> ${mrr2/1000:.1f}K</div><div class="d">Q1: ${mrr1/1000:.1f}K · QoQ {100*(mrr2/mrr1-1):+.0f}%</div></div>
 </div>
 
-<p>We looked at every self-serve signup between Jan 1 and Jun 30, 2026 ({f0(n1*3+n2*3)} leads), joined to the website session that generated it and to its closed opportunity. A <b>paying customer</b> (or win) is an opportunity with amount &gt; $0 closed within 30 days of signup. We compare Q1 (Jan–Mar, before Free CRM) against Q2 (Apr–Jun, after launch) using monthly averages, and group signups by the month they signed up (cohorts), not by close date.</p>
-
-<div class="callout"><b>Data validation</b>The raw tables needed cleanup before we could trust them: duplicate rows, broken join keys, amounts recorded 1,000× too high, a sign bug in days to close, out-of-range dates and inconsistent channel labels. We applied 14 documented rules; under 2% of rows were affected. Results hold with and without $0 deals. Full detail in <a href="data-methodology.html">Data methodology</a>.</div>
+<h2>Data</h2>
+<p>We used {f0(n_sessions)} website sessions, {f0(n_signups)} signups and {f0(n_opps)} closed opportunities. Sessions and signups cover Jan 1 – Jun 30, 2026; opportunities run to {opp_end:%b %-d} so June signups have time to close. Signups are grouped by the month they signed up (cohorts) and compared as Q1 (Jan–Mar, before Free CRM) vs Q2 (Apr–Jun, after launch) using monthly averages. A paying customer is an opportunity with amount &gt; $0 closed within 30 days of signup. How the data was validated, cleaned and joined is in <a href="data-methodology.html">Data methodology</a>.</p>
 
 <h2>Problem</h2>
 <p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from {cr1:.0f}% to {cr2:.0f}% and paying customers dropped ~{100*(1-w2/w1):.0f}% ({f0(w1)} → {f0(w2)}/month), even as signups grew {100*(n2/n1-1):.0f}%. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
 
 <h2>Hypotheses</h2>
 <ol class="hyp">
-  <li><b>Free CRM is cannibalizing Starter and Pro (plan mix shift).</b> People who used to start a paid trial now pick the free plan, which converts much less. <span class="verdict">Supported</span></li>
+  <li><b>Free CRM is cannibalizing Starter and Pro (SKU mix shift).</b> People who used to start a paid trial now pick the free plan, which converts much less. <span class="verdict">Supported</span></li>
   <li><b>Signup quality deteriorated (top of funnel).</b> Traffic nearly doubled, mostly from Display. If the new traffic brought lower-intent signups, conversion would fall regardless of plan. <span class="verdict">Not supported</span></li>
 </ol>
 
 <h2>What we found</h2>
 <ol class="findings">
-  <li><b>The plan mix shift drives the drop.</b> Starter went from {pct(100*pp[("Q1","Starter")][0]/n1)} of signups to {pct(100*pp[("Q2","Starter")][0]/n2)}, Pro from {pct(100*pp[("Q1","Pro")][0]/n1)} to {pct(100*pp[("Q2","Pro")][0]/n2)}, and Free CRM took {pct(100*free_n/n2)}. Conversion inside each trial stayed flat (Starter {pp[("Q1","Starter")][1]:.0f}% → {pp[("Q2","Starter")][1]:.0f}%, Pro {pp[("Q1","Pro")][1]:.0f}% → {pp[("Q2","Pro")][1]:.0f}%<sup><a href="#pro">†</a></sup>). Decomposing the change in monthly wins, the mix shift takes away {f0(-mix_total)} wins/month, more signups add back {f0(kd[("Volume effect",None)])}, and conversion changes inside each plan account for {f1(rate_total)}. In other words, this is not a conversion problem, it's a plan mix problem.</li>
+  <li><b>The SKU mix shifted; signup-to-paid conversion by SKU didn't.</b> Starter went from {pct(100*pp[("Q1","Starter")][0]/n1)} of signups to {pct(100*pp[("Q2","Starter")][0]/n2)}, Pro from {pct(100*pp[("Q1","Pro")][0]/n1)} to {pct(100*pp[("Q2","Pro")][0]/n2)}, and Free CRM took {pct(100*free_n/n2)}. Signup-to-paid by SKU stayed flat (Starter {pp[("Q1","Starter")][1]:.0f}% → {pp[("Q2","Starter")][1]:.0f}%, Pro {pp[("Q1","Pro")][1]:.0f}% → {pp[("Q2","Pro")][1]:.0f}%<sup><a href="#pro">†</a></sup>).</li>
   <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice, including visitors who land on the Starter trial page (67%) and on pricing (68%). If traffic quality were the cause, we'd see it concentrated in some channels and building gradually as Display grew from February. We don't, so hypothesis 2 is not the driver.</li>
-  <li><b>Most Free CRM signups replaced trial signups.</b> Trial signups fell by {f0(substitution)}/month while Free CRM added {f0(free_n)}. At most {f0(net_new)} of those (~{100*net_new/free_n:.0f}%) are net new signups<sup><a href="#star">*</a></sup>; the other ~{100*substitution/free_n:.0f}% are people who would likely have started a trial before.</li>
-  <li><b>Free CRM monetizes only into Starter, and only early.</b> All {fcrm_up[0]} Free CRM upgrades were to Starter ($35); none went to Pro. All happened within {fcrm_up[2]} days of signup (median {fcrm_up[3]:.0f}). To replace the trial wins it cannibalized, Free CRM would need ~{be_wins:.0f}% lifetime conversion (~{be_mrr:.0f}% to replace the MRR). It converts {free_cr:.1f}% today.</li>
+  <li><b>Net signup growth is much smaller than Free CRM's volume.</b> Starter and Pro trial signups dropped by {f0(substitution)}/month and Free CRM grew by {f0(free_n)}, netting out at +{f0(net_new)} signups/month. That lift could be attributed to Free CRM, but not conclusively<sup><a href="#star">*</a></sup>.</li>
+  <li><b>Free CRM upgrades go only to Starter.</b> All {fcrm_up[0]} Free CRM upgrades were to Starter ($35); none went to Pro. All happened within {fcrm_up[2]} days of signup.</li>
 </ol>
 <p class="note-foot" id="star">* {f0(net_new)} net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew {traffic_growth:.0f}% (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
 <p class="note-foot" id="pro">† Pro's Q1 average is lifted by January (38.6%). Feb–Jun Pro ranges 26–32%, in line with Q2.</p>
@@ -502,19 +505,19 @@ sup a {{ text-decoration:none; }}
 
 <h3>2. Free CRM took two thirds of signups from day one</h3>
 <figure>
-  <figcaption><div class="t" id="c1t">Signups per month by plan</div><div class="s">The mix flips on Apr 1 and stays stable after.</div></figcaption>
+  <figcaption><div class="t" id="c1t">Signups per month by SKU</div><div class="s">The mix flips on Apr 1 and stays stable after.</div></figcaption>
   {ch_signups}
   {legend([(p, PC[p]) for p in PRODUCTS])}
 </figure>
 <figure>
-  <figcaption><div class="t" id="c2t">Paying customers per month by plan signed up for</div><div class="s">Cohort view: wins within 30 days, grouped by signup month.</div></figcaption>
+  <figcaption><div class="t" id="c2t">Paying customers per month by SKU signed up for</div><div class="s">Cohort view: wins within 30 days, grouped by signup month.</div></figcaption>
   {ch_wins}
   {legend([(p, PC[p]) for p in PRODUCTS])}
 </figure>
 
-<h3>3. Conversion inside each plan didn't move</h3>
+<h3>3. Signup-to-paid by SKU didn't move</h3>
 <figure>
-  <figcaption><div class="t" id="c3t">Signup → paid conversion by plan</div><div class="s">Starter and Pro hold at ~26–32%. The blended rate falls because Free CRM, at ~5%, is now most of the volume.</div></figcaption>
+  <figcaption><div class="t" id="c3t">Signup → paid conversion by SKU</div><div class="s">Starter and Pro hold at ~26–32%. The blended rate falls because Free CRM, at ~5%, is now most of the volume.</div></figcaption>
   {ch_conv}
   {legend([(p, PC[p]) for p in ["Starter", "Pro", "Free CRM"]] + [("Blended (all signups)", "--ink-total")])}
 </figure>
@@ -522,7 +525,7 @@ sup a {{ text-decoration:none; }}
 <p>This is a textbook case of Simpson's paradox: the overall rate falls even though no group's rate falls, because the weight of each group changes.</p>
 
 <h3>4. How much of the drop each factor explains</h3>
-<p>We split the change in monthly paying customers into three parts (Kitagawa decomposition): <b>volume</b> (more signups), <b>mix</b> (which plan they choose) and <b>rate</b> (conversion inside each plan). The three parts add up exactly to the total change.</p>
+<p>We split the change in monthly paying customers into three parts (Kitagawa decomposition): <b>volume</b> (more signups), <b>mix</b> (which SKU they sign up for) and <b>rate</b> (conversion inside each SKU). The three parts add up exactly to the total change.</p>
 <figure>
   <figcaption><div class="t" id="c4t">From {f0(w1)} to {f0(w2)} paying customers per month</div><div class="s">Blue adds wins, red takes them away. Q1 vs Q2 monthly averages.</div></figcaption>
   {ch_water}
@@ -541,7 +544,7 @@ sup a {{ text-decoration:none; }}
 
 <h3>6. Free CRM: substitution vs new demand, and what it would take to break even</h3>
 <p>Trial signups (Starter + Pro) went from {f0(trial1)} to {f0(trial2)} per month ({100*(trial2/trial1-1):.0f}%). Free CRM brought {f0(free_n)}. Total signups grew only {f0(net_new)}/month, so at least ~{100*substitution/free_n:.0f}% of Free CRM volume came from people who would have trialed.</p>
-<p>The trials lost ~{f0(lost_wins)} paying customers and ~${lost_mrr/1000:.1f}K in new MRR per month. Free CRM upgrades all go to Starter at $35:</p>
+<p>The trials lost ~{f0(lost_wins)} paying customers and ~${lost_mrr/1000:.1f}K in new deal value per month. Free CRM upgrades all go to Starter at $35:</p>
 <figure>
   <figcaption><div class="t" id="c6t">Free CRM lifetime conversion needed to break even</div><div class="s">Based on {f0(free_n)} Free CRM signups/month and Q2 monthly averages.</div></figcaption>
   {ch_be}
