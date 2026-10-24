@@ -473,7 +473,7 @@ sup a {{ text-decoration:none; }}
 
 <h2>Hypotheses</h2>
 <ol class="hyp">
-  <li><b>Free CRM is cannibalizing Starter and Pro (SKU mix shift).</b> People who used to start a Pro or Starter trial now get Free CRM, which converts much less.</li>
+  <li><b>Free CRM is cannibalizing Starter and Pro (SKU mix shift).</b> People who used to start a Pro or Starter trial now get Free CRM. If Free CRM converts at a lower rate, it could be pulling down the blended conversion rate.</li>
   <li><b>Signup quality deteriorated (top of funnel).</b> Lower-quality signups could also explain the drop in conversion, regardless of which SKU people sign up for.</li>
 </ol>
 
