@@ -23,6 +23,19 @@ SELECT month, sessions, signups, wins_30d, new_mrr_30d,
 FROM sess JOIN sig USING (month)
 ORDER BY month;
 
+-- 1b. Weekly cohort funnel (Monday-start weeks). Only complete 7-day weeks are
+--     kept: the first (Jan 1-4) and last (Jun 29-30) weeks are partial.
+CREATE OR REPLACE TABLE weekly_funnel AS
+SELECT date_trunc('week', created_dt)::DATE         AS week_start,
+       COUNT(*)                                     AS signups,
+       SUM((product = 'Free CRM')::INT)             AS free_crm_signups,
+       SUM(win_30d::INT)                            AS wins_30d,
+       ROUND(100.0 * AVG(win_30d::INT), 1)          AS signup_to_win_pct
+FROM signup_outcomes
+GROUP BY 1
+HAVING date_diff('day', MIN(created_dt), MAX(created_dt)) = 6   -- full week only
+ORDER BY 1;
+
 -- 2. Same funnel split by product (mix, conversion, wins, MRR)
 CREATE OR REPLACE TABLE product_funnel AS
 SELECT signup_month AS month, product,

@@ -287,12 +287,129 @@ def hbars(title_id, items, xmax, unit="%"):
     out.append("</svg>")
     return "".join(out)
 
+
+weekly = q("SELECT week_start, signups, wins_30d, signup_to_win_pct FROM weekly_funnel ORDER BY 1")
+
+def panels_weekly(title_id):
+    """Two stacked panels on one shared week axis: signups (columns) and
+    signup->paid conversion (line). Two panels instead of a dual axis."""
+    import datetime as dt
+    n = len(weekly)
+    L, R, T = 52, 70, 22
+    H1, GAP, H2, B = 150, 46, 150, 30
+    H = T + H1 + GAP + H2 + B
+    pw = W - L - R
+    band = pw / n; cw = min(14, band * 0.62)
+    xc = lambda i: L + band * i + band / 2
+    smax = 400
+    y1 = lambda v: T + H1 * (1 - v / smax)
+    cmax = 40
+    top2 = T + H1 + GAP
+    y2 = lambda v: top2 + H2 * (1 - v / cmax)
+    out = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-labelledby="{title_id}">']
+    # panel titles
+    out.append(f'<text class="hdr" x="{L}" y="{T-8}">Signups per week</text>')
+    out.append(f'<text class="hdr" x="{L}" y="{top2-8}">Signup → paid conversion (30-day)</text>')
+    for t in range(0, smax + 1, 100):
+        out.append(f'<line class="grid" x1="{L}" x2="{W-R}" y1="{y1(t):.1f}" y2="{y1(t):.1f}"/>'
+                   f'<text class="tick" x="{L-8}" y="{y1(t)+4:.1f}" text-anchor="end">{t}</text>')
+    for t in range(0, cmax + 1, 10):
+        out.append(f'<line class="grid" x1="{L}" x2="{W-R}" y1="{y2(t):.1f}" y2="{y2(t):.1f}"/>'
+                   f'<text class="tick" x="{L-8}" y="{y2(t)+4:.1f}" text-anchor="end">{t}%</text>')
+    # columns
+    for i, (wk, sg, wn, cr) in enumerate(weekly):
+        x = xc(i) - cw / 2
+        tip = f"Week of {wk:%b %-d}: {sg:,} signups · {cr:.1f}% signup → paid ({int(wn)} paying)"
+        out.append(f'<path d="{col_path(x, y1(sg), cw, y1(0))}" fill="var(--bar-neutral)" data-tip="{esc(tip)}"/>')
+    # line
+    pts = [(xc(i), y2(cr), cr, wk, sg, wn) for i, (wk, sg, wn, cr) in enumerate(weekly)]
+    out.append('<path d="M' + " L".join(f"{px:.1f},{py:.1f}" for px, py, *_ in pts) + '" fill="none" stroke="var(--s1)" class="ln"/>')
+    for px, py, cr, wk, sg, wn in pts:
+        tip = f"Week of {wk:%b %-d}: {cr:.1f}% signup → paid · {sg:,} signups"
+        out.append(f'<circle cx="{px:.1f}" cy="{py:.1f}" r="4" fill="var(--s1)" class="dot" data-tip="{esc(tip)}"/>')
+    # period averages as labels on the line panel
+    q1w = [r for r in weekly if r[0] < dt.date(2026, 3, 30)]
+    q2w = [r for r in weekly if r[0] >= dt.date(2026, 4, 6)]
+    a1 = 100 * sum(r[2] for r in q1w) / sum(r[1] for r in q1w)
+    a2 = 100 * sum(r[2] for r in q2w) / sum(r[1] for r in q2w)
+    out.append(f'<text class="end" x="{xc(0):.1f}" y="{y2(a1)-14:.1f}">Before launch: ~{a1:.0f}%</text>')
+    out.append(f'<text class="end" x="{xc(len(weekly)-1):.1f}" y="{y2(a2)-14:.1f}" text-anchor="end">After launch: ~{a2:.0f}%</text>')
+    # launch marker: Apr 1 sits 2 days into the week of Mar 30
+    li = next(i for i, r in enumerate(weekly) if r[0] == dt.date(2026, 3, 30))
+    xl = L + band * li + band * (2 / 7)
+    out.append(f'<line class="launch" x1="{xl:.1f}" x2="{xl:.1f}" y1="{T-2}" y2="{top2+H2}"/>')
+    out.append(f'<text class="note" x="{xl+6:.1f}" y="{T+10}">Free CRM launch · Apr 1</text>')
+    # month labels at the first full week of each month
+    seen = set()
+    for i, r in enumerate(weekly):
+        m = r[0].month if r[0].day <= 7 else None
+        if m and m not in seen:
+            seen.add(m)
+            out.append(f'<text class="tick" x="{xc(i):.1f}" y="{H-10}" text-anchor="middle">{r[0]:%b %-d}</text>')
+    out.append(f'<line class="axis" x1="{L}" x2="{W-R}" y1="{y1(0):.1f}" y2="{y1(0):.1f}"/>')
+    out.append(f'<line class="axis" x1="{L}" x2="{W-R}" y1="{y2(0):.1f}" y2="{y2(0):.1f}"/>')
+    out.append("</svg>")
+    return "".join(out), a1, a2
+
+
+def combo_weekly(title_id):
+    """Columns = weekly signups (right axis), line = signup->paid conversion (left axis).
+    Both axes start at zero so the visual relationship isn't distorted."""
+    import datetime as dt
+    n = len(weekly)
+    L, R, T, B = 52, 56, 36, 30
+    H = 330
+    ph = H - T - B
+    pw = W - L - R
+    band = pw / n; cw = min(14, band * 0.62)
+    xc = lambda i: L + band * i + band / 2
+    smax, cmax = 400, 40
+    ys = lambda v: T + ph * (1 - v / smax)
+    yc = lambda v: T + ph * (1 - v / cmax)
+    out = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-labelledby="{title_id}">']
+    out.append(f'<text class="axt" x="2" y="{T-14}">Conversion</text>')
+    out.append(f'<text class="axt" x="{W-R+8}" y="{T-14}">Signups</text>')
+    for k in range(0, 5):
+        cv, sv = k * 10, k * 100
+        y = yc(cv)
+        out.append(f'<line class="grid" x1="{L}" x2="{W-R}" y1="{y:.1f}" y2="{y:.1f}"/>'
+                   f'<text class="tick" x="{L-8}" y="{y+4:.1f}" text-anchor="end">{cv}%</text>'
+                   f'<text class="tick" x="{W-R+8}" y="{y+4:.1f}">{sv}</text>')
+    for i, (wk, sg, wn, cr) in enumerate(weekly):
+        x = xc(i) - cw / 2
+        tip = f"Week of {wk:%b %-d}: {sg:,} signups · {cr:.1f}% signup → paid ({int(wn)} paying)"
+        out.append(f'<path d="{col_path(x, ys(sg), cw, ys(0))}" fill="var(--bar-neutral)" data-tip="{esc(tip)}"/>')
+    pts = [(xc(i), yc(cr), cr, wk, sg) for i, (wk, sg, wn, cr) in enumerate(weekly)]
+    out.append('<path d="M' + " L".join(f"{px:.1f},{py:.1f}" for px, py, *_ in pts) + '" fill="none" stroke="var(--s1)" class="ln"/>')
+    for px, py, cr, wk, sg in pts:
+        tip = f"Week of {wk:%b %-d}: {cr:.1f}% signup → paid · {sg:,} signups"
+        out.append(f'<circle cx="{px:.1f}" cy="{py:.1f}" r="4" fill="var(--s1)" class="dot" data-tip="{esc(tip)}"/>')
+    q1w = [r for r in weekly if r[0] < dt.date(2026, 3, 30)]
+    q2w = [r for r in weekly if r[0] >= dt.date(2026, 4, 6)]
+    a1 = 100 * sum(r[2] for r in q1w) / sum(r[1] for r in q1w)
+    a2 = 100 * sum(r[2] for r in q2w) / sum(r[1] for r in q2w)
+    li = next(i for i, r in enumerate(weekly) if r[0] == dt.date(2026, 3, 30))
+    xl = L + band * li + band * (2 / 7)
+    out.append(f'<line class="launch" x1="{xl:.1f}" x2="{xl:.1f}" y1="{T-6}" y2="{T+ph}"/>')
+    out.append(f'<text class="note" x="{xl+6:.1f}" y="{T+2}">Free CRM launch · Apr 1</text>')
+    out.append(f'<text class="end halo" x="{xc(1):.1f}" y="{yc(36):.1f}">Conversion before launch: ~{a1:.0f}%</text>')
+    out.append(f'<text class="end halo" x="{xc(n-1):.1f}" y="{yc(19):.1f}" text-anchor="end">After launch: ~{a2:.0f}%</text>')
+    seen = set()
+    for i, r in enumerate(weekly):
+        if r[0].day <= 7 and r[0].month not in seen:
+            seen.add(r[0].month)
+            out.append(f'<text class="tick" x="{xc(i):.1f}" y="{H-10}" text-anchor="middle">{r[0]:%b %-d}</text>')
+    out.append(f'<line class="axis" x1="{L}" x2="{W-R}" y1="{T+ph:.1f}" y2="{T+ph:.1f}"/>')
+    out.append("</svg>")
+    return "".join(out), a1, a2
+
 def legend(items):
     return '<div class="legend">' + "".join(
         f'<span><i style="background:var({c})"></i>{esc(n)}</span>' for n, c in items) + "</div>"
 
 PC = {"Starter": "--s1", "Pro": "--s2", "Free CRM": "--s3", "Blended": "--ink-total"}
 
+ch_weekly, wk_a1, wk_a2 = combo_weekly("c0t")
 ch_signups = stacked_columns("c1t", [[(p, pv(p, "n", i + 1) or 0) for p in PRODUCTS] for i in range(6)], PC, 1500, 500)
 ch_wins = stacked_columns("c2t", [[(p, pv(p, "w", i + 1) or 0) for p in PRODUCTS] for i in range(6)], PC, 400, 100)
 blended = [r[5] for r in funnel]
@@ -369,7 +486,7 @@ page = f"""<!doctype html>
   --bg:#f9f9f7; --surface:#fcfcfb; --fg:#0b0b0b; --fg2:#52514e; --muted:#898781;
   --line:#e1e0d9; --axis:#c3c2b7; --accent:#1c5cab; --callout:#eef4fc;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --ink-total:#6b6a66;
-  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6;
+  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6; --bar-neutral:#b9b8b1;
 }}
 @media (prefers-color-scheme: dark) {{
   :root:where(:not([data-theme="light"])) {{
@@ -377,7 +494,7 @@ page = f"""<!doctype html>
     --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
     --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5;
+    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955;
   }}
 }}
 :root[data-theme="dark"] {{
@@ -385,7 +502,7 @@ page = f"""<!doctype html>
   --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
   --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5;
+  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955;
 }}
 * {{ box-sizing:border-box; }}
 body {{ margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }}
@@ -427,6 +544,9 @@ svg .lab {{ fill:var(--fg2); font-size:12px; }}
 svg .hdr {{ fill:var(--fg); font-size:12px; font-weight:600; }}
 svg .note {{ fill:var(--muted); font-size:11px; }}
 svg .marker {{ stroke:var(--axis); stroke-width:1; }}
+svg .halo {{ paint-order:stroke; stroke:var(--surface); stroke-width:4px; stroke-linejoin:round; font-weight:600; }}
+svg .axt {{ fill:var(--fg2); font-size:11px; font-weight:600; }}
+svg .launch {{ stroke:var(--fg2); stroke-width:1.5; stroke-dasharray:4 4; }}
 svg .conn {{ stroke:var(--muted); stroke-width:1; }}
 svg .bar-conn {{ stroke:var(--axis); stroke-width:2; }}
 svg .ln {{ stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }}
@@ -493,8 +613,14 @@ sup a {{ text-decoration:none; }}
 
 <h2>Analysis</h2>
 
-<h3>1. The funnel by signup month</h3>
-<p>Traffic and signups go up every month. Paying customers fall by half in April and stay there.</p>
+<h3>1. Signups grew while signup-to-paid conversion dropped</h3>
+<p>Signups keep growing through the period. Signup-to-paid conversion is flat until Free CRM launches, then drops in a single step and stays at the new level.</p>
+<figure>
+  <figcaption><div class="t" id="c0t">Signups grew while conversion dropped in one step</div><div class="s">Weekly signup cohorts, complete weeks only (Jan 5 – Jun 28). Hover for values.</div></figcaption>
+  {ch_weekly}
+  {legend([("Signup → paid conversion (left axis)", "--s1"), ("Signups (right axis)", "--bar-neutral")])}
+</figure>
+<p>Same view by month, with sessions and deal value:</p>
 {t_funnel}
 
 <h3>2. Free CRM took two thirds of signups from day one</h3>
