@@ -642,7 +642,6 @@ sup a {{ text-decoration:none; }}
   {ch_water}
   {legend([("Increase", "--pos"), ("Decrease", "--neg"), ("Total", "--ink-total")])}
 </figure>
-{t_kit}
 <p class="note-foot">Assumption: Free CRM didn't exist in Q1, so it has no Q1 conversion rate. We use its Q2 rate for both periods, which puts its whole effect in mix. Query: <a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>.</p>
 
 <h3>4. The drop is the same for every type of signup</h3>
