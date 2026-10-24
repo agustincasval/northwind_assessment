@@ -10,7 +10,7 @@
   --bg:#f9f9f7; --surface:#fcfcfb; --fg:#0b0b0b; --fg2:#52514e; --muted:#898781;
   --line:#e1e0d9; --axis:#c3c2b7; --accent:#1c5cab; --callout:#eef4fc;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --ink-total:#6b6a66;
-  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6; --bar-neutral:#b9b8b1;
+  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6; --bar-neutral:#b9b8b1; --track:#e4e3dd;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -18,7 +18,7 @@
     --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
     --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955;
+    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955; --track:#2e2e2c;
   }
 }
 :root[data-theme="dark"] {
@@ -26,7 +26,7 @@
   --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
   --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955;
+  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955; --track:#2e2e2c;
 }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -178,19 +178,13 @@ sup a { text-decoration:none; }
 <p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
 <p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
 
-<h3>5. Free CRM: substitution vs new demand, and what it would take to break even</h3>
-<p>Trial signups (Starter + Pro) went from 1,087 to 427 per month (-61%). Free CRM brought 932. Total signups grew only 271/month, so at least ~71% of Free CRM volume came from people who would have trialed.</p>
-<p>The trials lost ~192 paying customers and ~$8.3K in new deal value per month. Free CRM upgrades all go to Starter at $35:</p>
+<h3>5. What Free CRM would need to convert to replace the trials it took</h3>
+<p>Starter and Pro trials lost ~192 paying customers and ~$8.3K in deal value per month. Free CRM brings back 44 paying customers (all upgrades go to Starter at $35). To fully make up the difference, Free CRM would need to convert ~21% of its 932 monthly signups, vs 4.7% today.</p>
 <figure>
-  <figcaption><div class="t" id="c6t">Free CRM lifetime conversion needed to break even</div><div class="s">Based on 932 Free CRM signups/month and Q2 monthly averages.</div></figcaption>
-  <svg viewBox="0 0 680 160" role="img" aria-labelledby="c6t"><text class="lab" x="220" y="30.0" text-anchor="end">Free CRM today (30-day)</text><path d="M230,16.0 H287.4 Q291.4,16.0 291.4,20.0 V32.0 Q291.4,36.0 287.4,36.0 H230 Z" fill="var(--s3)" data-tip="Free CRM today (30-day): 4.7%"/><text class="val" x="299.4" y="30.0">4.7%</text><text class="lab" x="220" y="66.0" text-anchor="end">Needed to replace lost wins</text><path d="M230,52.0 H493.9 Q497.9,52.0 497.9,56.0 V68.0 Q497.9,72.0 493.9,72.0 H230 Z" fill="var(--ink-total)" data-tip="Needed to replace lost wins: 20.6%"/><text class="val" x="505.9" y="66.0">20.6%</text><text class="lab" x="220" y="102.0" text-anchor="end">Needed to replace lost deal value</text><path d="M230,88.0 H558.7 Q562.7,88.0 562.7,92.0 V104.0 Q562.7,108.0 558.7,108.0 H230 Z" fill="var(--ink-total)" data-tip="Needed to replace lost deal value: 25.6%"/><text class="val" x="570.7" y="102.0">25.6%</text><text class="lab" x="220" y="138.0" text-anchor="end">Starter / Pro trials (Q2)</text><path d="M230,124.0 H602.4 Q606.4,124.0 606.4,128.0 V140.0 Q606.4,144.0 602.4,144.0 H230 Z" fill="var(--s1)" data-tip="Starter / Pro trials (Q2): 29.0%"/><text class="val" x="614.4" y="138.0">29.0%</text><line class="axis" x1="230" x2="230" y1="8" y2="152"/></svg>
+  <figcaption><div class="t" id="c6t">Free CRM covers about a fifth of what the trials lost</div><div class="s">Track = what the trials lost per month (Q1 vs Q2). Fill = what Free CRM delivers today.</div></figcaption>
+  <svg viewBox="0 0 680 142" role="img" aria-labelledby="c6t"><text class="lab" x="198" y="40.0" text-anchor="end">Paying customers / month</text><rect x="210" y="24" width="320.0" height="24" rx="4" fill="var(--track)" data-tip="Paying customers / month: 192 needed (21% of Free CRM signups)"/><rect x="210" y="24" width="73.3" height="24" rx="4" fill="var(--s3)" data-tip="Paying customers / month: 44 today (4.7% of Free CRM signups)"/><text class="val" x="216.0" y="66.0">Today: 44 · 4.7% of Free CRM signups</text><text class="val" x="540.0" y="40.0">Needed: 192</text><text class="tick" x="540.0" y="55.0">21% of Free CRM signups</text><text class="lab" x="198" y="104.0" text-anchor="end">Deal value / month</text><rect x="210" y="88" width="320.0" height="24" rx="4" fill="var(--track)" data-tip="Deal value / month: $8.3K needed (26% conversion)"/><rect x="210" y="88" width="59.1" height="24" rx="4" fill="var(--s3)" data-tip="Deal value / month: $1.5K today (4.7% conversion)"/><text class="val" x="216.0" y="130.0">Today: $1.5K · 4.7% conversion</text><text class="val" x="540.0" y="104.0">Needed: $8.3K</text><text class="tick" x="540.0" y="119.0">26% conversion</text></svg>
+  <div class="legend"><span><i style="background:var(--s3)"></i>Free CRM today</span><span><i style="background:var(--track)"></i>Lost from Starter and Pro trials</span></div>
 </figure>
-<p>Free CRM users who don't upgrade in the first 30 days don't show up as paying later in this data. They also don't look different from trial users before signing up: same number of prior site visits (~0.6), same channel, page, device, size and country mix. Visiting the site again after signup doesn't predict upgrading either (4.2% vs 4.8%).</p>
-
-<h3>6. Finance view (by close date)</h3>
-<p>Finance counts customers by the month the deal closed. That view tells the same story, with one caveat: January is undercounted (some January closes come from December signups, which aren't in the data). Feb–Mar is the cleaner baseline.</p>
-<div class="tbl"><table class=""><thead><tr><th>Close month</th><th>Paying customers</th><th>All closed opps (incl. $0)</th><th>New deal value</th></tr></thead><tbody><tr><td>Jan</td><td>168</td><td>173</td><td>$8,955</td></tr><tr><td>Feb</td><td>313</td><td>318</td><td>$16,580</td></tr><tr><td>Mar</td><td>316</td><td>322</td><td>$15,485</td></tr><tr><td>Apr</td><td>228</td><td>235</td><td>$11,880</td></tr><tr><td>May</td><td>177</td><td>181</td><td>$10,095</td></tr><tr><td>Jun</td><td>161</td><td>164</td><td>$9,385</td></tr><tr><td>Jul</td><td>102</td><td>102</td><td>$5,670</td></tr></tbody></table></div>
-<p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
 
 <h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
 <p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
@@ -200,7 +194,7 @@ sup a { text-decoration:none; }
 <p>Everything in this document is produced by three SQL files (DuckDB, standard SQL). Run them in order from the repo root.</p>
 <ul>
   <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a> — cleaning rules R1–R14 and the analysis base table <code>signup_outcomes</code></li>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a> — monthly funnel, plan split, slice conversion, finance view</li>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a> — monthly and weekly funnel, SKU split, slice conversion, finance view</li>
   <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a> — Kitagawa decomposition</li>
 </ul>
 <details><summary>Win definition (from 01_clean.sql)</summary><pre>-- ANALYSIS BASE: 1 row per signup with origin attributes + 30-day win
@@ -312,6 +306,11 @@ FROM kitagawa
 GROUP BY step
 ORDER BY CASE step WHEN &#x27;Q1 wins / month&#x27; THEN 1 WHEN &#x27;Volume effect&#x27; THEN 2
                    WHEN &#x27;Mix effect&#x27; THEN 3 WHEN &#x27;Rate effect&#x27; THEN 4 ELSE 5 END;</pre></details>
+
+<h2 id="appendix-c">Appendix C — Reconciliation with the finance view</h2>
+<p>Finance counts customers by the month the deal closed; this analysis counts them by the month the customer signed up (cohort). The monthly numbers differ but tell the same story. One caveat: January close-month counts are low because some January closes come from December signups, which aren't in the data, so Feb–Mar is the cleaner baseline for the finance view.</p>
+<div class="tbl"><table class=""><thead><tr><th>Close month</th><th>Paying customers</th><th>All closed opps (incl. $0)</th><th>New deal value</th></tr></thead><tbody><tr><td>Jan</td><td>168</td><td>173</td><td>$8,955</td></tr><tr><td>Feb</td><td>313</td><td>318</td><td>$16,580</td></tr><tr><td>Mar</td><td>316</td><td>322</td><td>$15,485</td></tr><tr><td>Apr</td><td>228</td><td>235</td><td>$11,880</td></tr><tr><td>May</td><td>177</td><td>181</td><td>$10,095</td></tr><tr><td>Jun</td><td>161</td><td>164</td><td>$9,385</td></tr><tr><td>Jul</td><td>102</td><td>102</td><td>$5,670</td></tr></tbody></table></div>
+<p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
 </main>
 <div id="tip" role="tooltip"></div>
 <script>

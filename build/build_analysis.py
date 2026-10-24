@@ -403,6 +403,27 @@ def combo_weekly(title_id):
     out.append("</svg>")
     return "".join(out), a1, a2
 
+
+def gap_bars(title_id, rows):
+    """Bullet bars: light track = amount needed, filled = what Free CRM delivers today."""
+    L, R, T, rh = 210, 150, 10, 64
+    H = T + rh * len(rows) + 4
+    pw = W - L - R
+    out = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-labelledby="{title_id}">']
+    for i, (label, have, need, fmt, have_note, need_note) in enumerate(rows):
+        cy = T + rh * i + 26
+        x = lambda v: L + pw * v / need
+        out.append(f'<text class="lab" x="{L-12}" y="{cy+4:.1f}" text-anchor="end">{esc(label)}</text>')
+        out.append(f'<rect x="{L}" y="{cy-12}" width="{pw:.1f}" height="24" rx="4" fill="var(--track)" '
+                   f'data-tip="{esc(label)}: {fmt(need)} needed ({need_note})"/>')
+        out.append(f'<rect x="{L}" y="{cy-12}" width="{x(have)-L:.1f}" height="24" rx="4" fill="var(--s3)" '
+                   f'data-tip="{esc(label)}: {fmt(have)} today ({have_note})"/>')
+        out.append(f'<text class="val" x="{L+6:.1f}" y="{cy+30:.1f}">Today: {fmt(have)} · {esc(have_note)}</text>')
+        out.append(f'<text class="val" x="{W-R+10:.1f}" y="{cy+4:.1f}">Needed: {fmt(need)}</text>')
+        out.append(f'<text class="tick" x="{W-R+10:.1f}" y="{cy+19:.1f}">{esc(need_note)}</text>')
+    out.append("</svg>")
+    return "".join(out)
+
 def legend(items):
     return '<div class="legend">' + "".join(
         f'<span><i style="background:var({c})"></i>{esc(n)}</span>' for n, c in items) + "</div>"
@@ -418,10 +439,12 @@ ch_conv = line_chart("c3t", {"Starter": [pv("Starter", "cr", i + 1) for i in ran
                              "Blended": blended}, PC, 40, 10)
 ch_water = waterfall("c4t")
 ch_dumb = dumbbell("c5t")
-ch_be = hbars("c6t", [("Free CRM today (30-day)", free_cr, "--s3"),
-                      ("Needed to replace lost wins", be_wins, "--ink-total"),
-                      ("Needed to replace lost deal value", be_mrr, "--ink-total"),
-                      ("Starter / Pro trials (Q2)", pp[("Q2", "Starter")][1], "--s1")], 30)
+free_w = pp[("Q2", "Free CRM")][2]
+free_val = free_w * 35
+ch_be = gap_bars("c6t", [
+    ("Paying customers / month", free_w, lost_wins, f0, f"{free_cr:.1f}% of Free CRM signups", f"{be_wins:.0f}% of Free CRM signups"),
+    ("Deal value / month", free_val, lost_mrr, lambda v: f"${v/1000:.1f}K", f"{free_cr:.1f}% conversion", f"{be_mrr:.0f}% conversion"),
+])
 
 # ------------------------------------------------------------------ tables
 def table(head, rows, cls=""):
@@ -485,7 +508,7 @@ page = f"""<!doctype html>
   --bg:#f9f9f7; --surface:#fcfcfb; --fg:#0b0b0b; --fg2:#52514e; --muted:#898781;
   --line:#e1e0d9; --axis:#c3c2b7; --accent:#1c5cab; --callout:#eef4fc;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --ink-total:#6b6a66;
-  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6; --bar-neutral:#b9b8b1;
+  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6; --bar-neutral:#b9b8b1; --track:#e4e3dd;
 }}
 @media (prefers-color-scheme: dark) {{
   :root:where(:not([data-theme="light"])) {{
@@ -493,7 +516,7 @@ page = f"""<!doctype html>
     --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
     --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955;
+    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955; --track:#2e2e2c;
   }}
 }}
 :root[data-theme="dark"] {{
@@ -501,7 +524,7 @@ page = f"""<!doctype html>
   --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
   --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955;
+  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955; --track:#2e2e2c;
 }}
 * {{ box-sizing:border-box; }}
 body {{ margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }}
@@ -653,19 +676,13 @@ sup a {{ text-decoration:none; }}
 <p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
 <p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
 
-<h3>5. Free CRM: substitution vs new demand, and what it would take to break even</h3>
-<p>Trial signups (Starter + Pro) went from {f0(trial1)} to {f0(trial2)} per month ({100*(trial2/trial1-1):.0f}%). Free CRM brought {f0(free_n)}. Total signups grew only {f0(net_new)}/month, so at least ~{100*substitution/free_n:.0f}% of Free CRM volume came from people who would have trialed.</p>
-<p>The trials lost ~{f0(lost_wins)} paying customers and ~${lost_mrr/1000:.1f}K in new deal value per month. Free CRM upgrades all go to Starter at $35:</p>
+<h3>5. What Free CRM would need to convert to replace the trials it took</h3>
+<p>Starter and Pro trials lost ~{f0(lost_wins)} paying customers and ~${lost_mrr/1000:.1f}K in deal value per month. Free CRM brings back {f0(free_w)} paying customers (all upgrades go to Starter at $35). To fully make up the difference, Free CRM would need to convert ~{be_wins:.0f}% of its {f0(free_n)} monthly signups, vs {free_cr:.1f}% today.</p>
 <figure>
-  <figcaption><div class="t" id="c6t">Free CRM lifetime conversion needed to break even</div><div class="s">Based on {f0(free_n)} Free CRM signups/month and Q2 monthly averages.</div></figcaption>
+  <figcaption><div class="t" id="c6t">Free CRM covers about a fifth of what the trials lost</div><div class="s">Track = what the trials lost per month (Q1 vs Q2). Fill = what Free CRM delivers today.</div></figcaption>
   {ch_be}
+  {legend([("Free CRM today", "--s3"), ("Lost from Starter and Pro trials", "--track")])}
 </figure>
-<p>Free CRM users who don't upgrade in the first 30 days don't show up as paying later in this data. They also don't look different from trial users before signing up: same number of prior site visits (~0.6), same channel, page, device, size and country mix. Visiting the site again after signup doesn't predict upgrading either (4.2% vs 4.8%).</p>
-
-<h3>6. Finance view (by close date)</h3>
-<p>Finance counts customers by the month the deal closed. That view tells the same story, with one caveat: January is undercounted (some January closes come from December signups, which aren't in the data). Feb–Mar is the cleaner baseline.</p>
-{t_fin}
-<p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
 
 <h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
 <p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
@@ -675,11 +692,16 @@ sup a {{ text-decoration:none; }}
 <p>Everything in this document is produced by three SQL files (DuckDB, standard SQL). Run them in order from the repo root.</p>
 <ul>
   <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a> — cleaning rules R1–R14 and the analysis base table <code>signup_outcomes</code></li>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a> — monthly funnel, plan split, slice conversion, finance view</li>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a> — monthly and weekly funnel, SKU split, slice conversion, finance view</li>
   <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a> — Kitagawa decomposition</li>
 </ul>
 <details><summary>Win definition (from 01_clean.sql)</summary><pre>{esc(WIN_SQL)}</pre></details>
 <details><summary>Decomposition (03_decomposition.sql)</summary><pre>{esc(Path("sql/03_decomposition.sql").read_text().strip())}</pre></details>
+
+<h2 id="appendix-c">Appendix C — Reconciliation with the finance view</h2>
+<p>Finance counts customers by the month the deal closed; this analysis counts them by the month the customer signed up (cohort). The monthly numbers differ but tell the same story. One caveat: January close-month counts are low because some January closes come from December signups, which aren't in the data, so Feb–Mar is the cleaner baseline for the finance view.</p>
+{t_fin}
+<p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
 </main>
 <div id="tip" role="tooltip"></div>
 <script>
