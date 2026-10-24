@@ -506,6 +506,17 @@ t_traffic = table(["Channel", "Sessions/mo Q1", "Sessions/mo Q2", "Δ sessions",
     + [["<b>All channels</b>", f"<b>{f0(sess_q['Q1'])}</b>", f"<b>{f0(sess_q['Q2'])}</b>", f"<b>{d_sess_tot:+,.0f}</b>", "<b>100%</b>",
         f"<b>{100*n1/sess_q['Q1']:.2f}%</b>", f"<b>{100*n2/sess_q['Q2']:.2f}%</b>", "<b>100%</b>"]], "num")
 
+weekly_full = q("SELECT week_start, signups, free_crm_signups, wins_30d, signup_to_win_pct FROM weekly_funnel ORDER BY 1")
+t_weekly = table(["Week of", "Signups", "Free CRM share", "Paying customers (30d)", "Signup → paid"],
+    [[f"{w:%b %-d}", f0(n), f"{100*fc/n:.0f}%", f0(wn), f"{cr:.1f}%"] for w, n, fc, wn, cr in weekly_full], "num")
+sku_rows = []
+for m in range(1, 7):
+    for p_ in PRODUCTS:
+        d_ = prod[p_].get(m)
+        if d_:
+            sku_rows.append([MONTHS[m-1], f'<i class="sw" style="background:var({PC[p_]})"></i>{p_}', f0(d_["n"]), f'{d_["mix"]:.0f}%', f'{d_["cr"]:.1f}%', f0(d_["w"]), "$" + f0(d_["mrr"])])
+t_sku_month = table(["Month", "SKU", "Signups", "Mix", "Signup → paid", "Paying customers (30d)", "Deal value (30d)"], sku_rows, "num")
+
 t_fin = table(["Close month", "Paying customers", "All closed opps (incl. $0)", "New deal value"],
               [[m, f0(p), f0(a), "$" + f0(mr)] for m, p, a, mr in fin])
 
@@ -604,6 +615,7 @@ table.kit td:nth-child(3), table.kit th:nth-child(3) {{ text-align:left; color:v
 details {{ margin:12px 0; }}
 summary {{ cursor:pointer; font-weight:600; }}
 pre {{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px; overflow-x:auto; font-size:12.5px; line-height:1.5; }}
+.gloss li {{ margin-bottom:6px; }}
 .pending {{ border:1px dashed var(--axis); border-radius:10px; padding:16px 18px; color:var(--fg2); }}
 sup a {{ text-decoration:none; }}
 </style>
@@ -690,31 +702,57 @@ sup a {{ text-decoration:none; }}
   {legend([("Q1 (Jan–Mar)", "--q1"), ("Q2 (Apr–Jun)", "--q2")])}
 </figure>
 <p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
-<p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
+<p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-b">Appendix B4</a>.</p>
 
 <h3>5. Where the traffic growth came from</h3>
 <p>Monthly averages, Q1 vs Q2. Display and Direct account for nearly all the new sessions. The other channels stayed flat in volume but turned more of their visits into signups.</p>
 {t_traffic}
 <p class="note-foot">Direct triples in June (26K sessions) while its session-to-signup rate drops to 1.3%; likely a tracking or bot issue worth checking at the source.</p>
 
-<h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
-<p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
+<h2 id="appendix-a">Appendix A — Glossary</h2>
+<ul class="gloss">
+  <li><b>Session:</b> one visit to the Northwind website.</li>
+  <li><b>Signup:</b> a lead registering for one SKU: Starter trial, Pro trial or Free CRM.</li>
+  <li><b>SKU:</b> the product a lead signs up for (Starter trial, Pro trial or Free CRM). Not the plan they end up buying: Free CRM upgrades are bought as Starter.</li>
+  <li><b>Win / paying customer:</b> a signup whose opportunity closed with an amount above $0 within 30 days of signing up. $0 deals (comps, coupons, internal) don't count.</li>
+  <li><b>Signup → paid conversion:</b> wins divided by signups, for the same group of signups.</li>
+  <li><b>Blended conversion:</b> signup → paid across all SKUs together.</li>
+  <li><b>Cohort:</b> signups grouped by the week or month they signed up. A cohort's wins are counted whenever they close, up to 30 days later.</li>
+  <li><b>Q1 / Q2:</b> Jan–Mar 2026 (before Free CRM) and Apr–Jun 2026 (after launch), compared as monthly averages.</li>
+  <li><b>QoQ:</b> change from the Q1 monthly average to the Q2 monthly average.</li>
+  <li><b>Mix shift:</b> a change in the share of signups going to each SKU.</li>
+  <li><b>Deal value:</b> the opportunity amount: $35 for Starter, $110 for Pro.</li>
+</ul>
+
+<h2 id="appendix-b">Appendix B — Data behind the charts</h2>
+
+<h4>B1. Weekly signups and signup → paid conversion (section 1)</h4>
+<p class="note-foot">Complete Monday–Sunday weeks only. Free CRM launched Wednesday Apr 1, inside the week of Mar 30.</p>
+{t_weekly}
+
+<h4>B2. Signups and conversion by SKU, monthly (section 2)</h4>
+{t_sku_month}
+
+<h4>B3. Decomposition of the change in paying customers (section 3)</h4>
+{t_kit}
+<p class="note-foot">Free CRM has no Q1 rate; its Q2 rate is used for both periods, which puts its whole effect in mix.</p>
+
+<h4>B4. Signup → paid conversion by origin slice, monthly (section 4)</h4>
+<p class="note-foot">All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
 {slice_tables()}
 
-<h2 id="appendix-b">Appendix B — Queries</h2>
-<p>Everything in this document is produced by three SQL files (DuckDB, standard SQL). Run them in order from the repo root.</p>
-<ul>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a> — cleaning rules R1–R14 and the analysis base table <code>signup_outcomes</code></li>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a> — monthly and weekly funnel, SKU split, slice conversion, finance view</li>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a> — Kitagawa decomposition</li>
-</ul>
-<details><summary>Win definition (from 01_clean.sql)</summary><pre>{esc(WIN_SQL)}</pre></details>
-<details><summary>Decomposition (03_decomposition.sql)</summary><pre>{esc(Path("sql/03_decomposition.sql").read_text().strip())}</pre></details>
-
 <h2 id="appendix-c">Appendix C — Reconciliation with the finance view</h2>
-<p>Finance counts customers by the month the deal closed; this analysis counts them by the month the customer signed up (cohort). The monthly numbers differ but tell the same story. One caveat: January close-month counts are low because some January closes come from December signups, which aren't in the data, so Feb–Mar is the cleaner baseline for the finance view.</p>
+<p>Finance counts customers by the month the deal closed; this analysis counts them by the month the customer signed up. The monthly numbers differ but tell the same story. January close-month counts are low because some January closes come from December signups, which aren't in the data.</p>
 {t_fin}
 <p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
+
+<h2 id="appendix-d">Appendix D — Queries</h2>
+<p>Every number in this document comes from three SQL files in the <a href="https://github.com/bald-phoenix/northwind_assessment">project repo</a>. How the data was validated and cleaned is in <a href="data-methodology.html">Data methodology</a>.</p>
+<ul>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a>: cleaning rules and the analysis base table</li>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a>: weekly and monthly funnel, SKU split, slices, finance view</li>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>: decomposition</li>
+</ul>
 </main>
 <div id="tip" role="tooltip"></div>
 <script>
