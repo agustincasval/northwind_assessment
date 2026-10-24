@@ -43,6 +43,20 @@ rate_total = sum(w for s, p, w in kit if s == "Rate effect")
 n_sessions = q('SELECT COUNT(*) FROM sessions_clean')[0][0]
 n_signups = q('SELECT COUNT(*) FROM signups_clean')[0][0]
 n_opps, opp_end = q('SELECT COUNT(*), MAX(close_dt) FROM opportunities_clean')[0]
+traffic = q("""
+WITH t AS (SELECT CASE WHEN event_dt < DATE '2026-04-01' THEN 'Q1' ELSE 'Q2' END p, mktg_channel ch,
+                  COUNT(*)/3.0 sess, SUM(converted_flag)/3.0 sig
+           FROM sessions_clean GROUP BY 1, 2)
+SELECT ch,
+       MAX(sess) FILTER (WHERE p='Q1'), MAX(sess) FILTER (WHERE p='Q2'),
+       100*MAX(sig) FILTER (WHERE p='Q1')/MAX(sess) FILTER (WHERE p='Q1'),
+       100*MAX(sig) FILTER (WHERE p='Q2')/MAX(sess) FILTER (WHERE p='Q2'),
+       MAX(sig) FILTER (WHERE p='Q2') - MAX(sig) FILTER (WHERE p='Q1')
+FROM t GROUP BY ch""")
+d_sess_tot = sum(r[2] - r[1] for r in traffic); d_sig_tot = sum(r[5] for r in traffic)
+low = [r for r in traffic if r[0] in ("Display", "Direct")]
+low_sess_share = 100 * sum(r[2] - r[1] for r in low) / d_sess_tot
+low_sig_share = 100 * sum(r[5] for r in low) / d_sig_tot
 sess_q = {r[0]: r[1] for r in q("""SELECT CASE WHEN event_dt < DATE '2026-04-01' THEN 'Q1' ELSE 'Q2' END, COUNT(*)/3.0
                                    FROM sessions_clean GROUP BY 1""")}
 
@@ -486,6 +500,12 @@ def slice_tables():
         out.append(f"<h4>{d}</h4>" + table([d] + MONTHS + ["Q1", "Q2", "Δ pp", "Free share Q2", "Signups/mo"], rows, "num"))
     return "".join(out)
 
+trows = sorted(traffic, key=lambda r: -(r[2] - r[1]))
+t_traffic = table(["Channel", "Sessions/mo Q1", "Sessions/mo Q2", "Δ sessions", "Share of new sessions", "Session → signup Q1", "Session → signup Q2", "Share of new signups"],
+    [[esc(r[0]), f0(r[1]), f0(r[2]), f"{r[2]-r[1]:+,.0f}", f"{100*(r[2]-r[1])/d_sess_tot:.0f}%", f"{r[3]:.2f}%", f"{r[4]:.2f}%", f"{100*r[5]/d_sig_tot:.0f}%"] for r in trows]
+    + [["<b>All channels</b>", f"<b>{f0(sess_q['Q1'])}</b>", f"<b>{f0(sess_q['Q2'])}</b>", f"<b>{d_sess_tot:+,.0f}</b>", "<b>100%</b>",
+        f"<b>{100*n1/sess_q['Q1']:.2f}%</b>", f"<b>{100*n2/sess_q['Q2']:.2f}%</b>", "<b>100%</b>"]], "num")
+
 t_fin = table(["Close month", "Paying customers", "All closed opps (incl. $0)", "New deal value"],
               [[m, f0(p), f0(a), "$" + f0(mr)] for m, p, a, mr in fin])
 
@@ -605,8 +625,6 @@ sup a {{ text-decoration:none; }}
 
 <h2>Data</h2>
 <p>We used {f0(n_sessions)} website sessions, {f0(n_signups)} signups and {f0(n_opps)} closed opportunities. Sessions and signups cover Jan 1 – Jun 30, 2026; opportunities run to {opp_end:%b %-d} so June signups have time to close. Signups are grouped by the month they signed up (cohorts) and compared as Q1 (Jan–Mar, before Free CRM) vs Q2 (Apr–Jun, after launch) using monthly averages. A paying customer is an opportunity with amount &gt; $0 closed within 30 days of signup. How the data was validated, cleaned and joined is in <a href="data-methodology.html">Data methodology</a>.</p>
-<p class="note-foot">Note: Direct traffic jumps to 37% of sessions in June while its session-to-signup rate halves (3.0% → 1.3%), likely a tracking or bot issue. It doesn't affect the signup-to-paid findings.</p>
-
 <h2>Problem</h2>
 <p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from {cr1:.0f}% to {cr2:.0f}% and paying customers dropped ~{100*(1-w2/w1):.0f}% ({f0(w1)} → {f0(w2)}/month), even as signups grew {100*(n2/n1-1):.0f}%. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
 
@@ -622,6 +640,7 @@ sup a {{ text-decoration:none; }}
   <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice. Signup quality doesn't explain the drop.</li>
   <li><b>Net signup growth is much smaller than Free CRM's volume.</b> Starter and Pro trial signups dropped by {f0(substitution)}/month and Free CRM grew by {f0(free_n)}, netting out at +{f0(net_new)} signups/month. That lift could be attributed to Free CRM, but not conclusively<sup><a href="#star">*</a></sup>.</li>
   <li><b>Free CRM upgrades go only to Starter.</b> All {fcrm_up[0]} Free CRM upgrades were to Starter ($35); none went to Pro. All happened within {fcrm_up[2]} days of signup.</li>
+  <li><b>Traffic growth came almost entirely from low-converting sources.</b> Sessions grew {traffic_growth:.0f}%, and {low_sess_share:.0f}% of the new sessions came from Display and Direct. Those two channels brought only {low_sig_share:.0f}% of the new signups: Display turns fewer than 0.5% of visits into signups, and Direct's rate fell from 2.9% to 1.9% as its volume nearly doubled. This affects traffic efficiency, not the quality of the signups (finding 2).</li>
 </ol>
 <p class="note-foot" id="star">* {f0(net_new)} net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew {traffic_growth:.0f}% (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
 <p class="note-foot" id="pro">† Pro's Q1 average is lifted by January (38.6%). Feb–Jun Pro ranges 26–32%, in line with Q2.</p>
@@ -672,6 +691,11 @@ sup a {{ text-decoration:none; }}
 </figure>
 <p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
 <p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
+
+<h3>5. Where the traffic growth came from</h3>
+<p>Monthly averages, Q1 vs Q2. Display and Direct account for nearly all the new sessions. The other channels stayed flat in volume but turned more of their visits into signups.</p>
+{t_traffic}
+<p class="note-foot">Direct triples in June (26K sessions) while its session-to-signup rate drops to 1.3%; likely a tracking or bot issue worth checking at the source.</p>
 
 <h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
 <p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>

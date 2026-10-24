@@ -111,8 +111,6 @@ sup a { text-decoration:none; }
 
 <h2>Data</h2>
 <p>We used 307,715 website sessions, 7,338 signups and 1,495 closed opportunities. Sessions and signups cover Jan 1 – Jun 30, 2026; opportunities run to Jul 26 so June signups have time to close. Signups are grouped by the month they signed up (cohorts) and compared as Q1 (Jan–Mar, before Free CRM) vs Q2 (Apr–Jun, after launch) using monthly averages. A paying customer is an opportunity with amount &gt; $0 closed within 30 days of signup. How the data was validated, cleaned and joined is in <a href="data-methodology.html">Data methodology</a>.</p>
-<p class="note-foot">Note: Direct traffic jumps to 37% of sessions in June while its session-to-signup rate halves (3.0% → 1.3%), likely a tracking or bot issue. It doesn't affect the signup-to-paid findings.</p>
-
 <h2>Problem</h2>
 <p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from 29% to 12% and paying customers dropped ~47% (316 → 168/month), even as signups grew 25%. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
 
@@ -128,6 +126,7 @@ sup a { text-decoration:none; }
   <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice. Signup quality doesn't explain the drop.</li>
   <li><b>Net signup growth is much smaller than Free CRM's volume.</b> Starter and Pro trial signups dropped by 660/month and Free CRM grew by 932, netting out at +271 signups/month. That lift could be attributed to Free CRM, but not conclusively<sup><a href="#star">*</a></sup>.</li>
   <li><b>Free CRM upgrades go only to Starter.</b> All 132 Free CRM upgrades were to Starter ($35); none went to Pro. All happened within 29 days of signup.</li>
+  <li><b>Traffic growth came almost entirely from low-converting sources.</b> Sessions grew 44%, and 98% of the new sessions came from Display and Direct. Those two channels brought only 43% of the new signups: Display turns fewer than 0.5% of visits into signups, and Direct's rate fell from 2.9% to 1.9% as its volume nearly doubled. This affects traffic efficiency, not the quality of the signups (finding 2).</li>
 </ol>
 <p class="note-foot" id="star">* 271 net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew 44% (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
 <p class="note-foot" id="pro">† Pro's Q1 average is lifted by January (38.6%). Feb–Jun Pro ranges 26–32%, in line with Q2.</p>
@@ -178,6 +177,11 @@ sup a { text-decoration:none; }
 </figure>
 <p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
 <p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
+
+<h3>5. Where the traffic growth came from</h3>
+<p>Monthly averages, Q1 vs Q2. Display and Direct account for nearly all the new sessions. The other channels stayed flat in volume but turned more of their visits into signups.</p>
+<div class="tbl"><table class="num"><thead><tr><th>Channel</th><th>Sessions/mo Q1</th><th>Sessions/mo Q2</th><th>Δ sessions</th><th>Share of new sessions</th><th>Session → signup Q1</th><th>Session → signup Q2</th><th>Share of new signups</th></tr></thead><tbody><tr><td>Display</td><td>7,891</td><td>18,558</td><td>+10,667</td><td>57%</td><td>0.37%</td><td>0.45%</td><td>20%</td></tr><tr><td>Direct</td><td>8,708</td><td>16,320</td><td>+7,611</td><td>41%</td><td>2.89%</td><td>1.93%</td><td>23%</td></tr><tr><td>Organic Search</td><td>10,416</td><td>10,515</td><td>+99</td><td>1%</td><td>2.76%</td><td>3.19%</td><td>18%</td></tr><tr><td>Referral</td><td>1,910</td><td>2,002</td><td>+92</td><td>0%</td><td>4.90%</td><td>5.21%</td><td>4%</td></tr><tr><td>Social</td><td>3,840</td><td>3,910</td><td>+70</td><td>0%</td><td>0.86%</td><td>1.18%</td><td>5%</td></tr><tr><td>Email</td><td>2,462</td><td>2,526</td><td>+65</td><td>0%</td><td>4.90%</td><td>5.81%</td><td>10%</td></tr><tr><td>Paid Search</td><td>6,739</td><td>6,776</td><td>+37</td><td>0%</td><td>4.03%</td><td>4.85%</td><td>21%</td></tr><tr><td><b>All channels</b></td><td><b>41,965</b></td><td><b>60,606</b></td><td><b>+18,641</b></td><td><b>100%</b></td><td><b>2.59%</b></td><td><b>2.24%</b></td><td><b>100%</b></td></tr></tbody></table></div>
+<p class="note-foot">Direct triples in June (26K sessions) while its session-to-signup rate drops to 1.3%; likely a tracking or bot issue worth checking at the source.</p>
 
 <h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
 <p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
