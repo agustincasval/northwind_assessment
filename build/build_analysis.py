@@ -440,11 +440,7 @@ ch_conv = line_chart("c3t", {"Starter": [pv("Starter", "cr", i + 1) for i in ran
 ch_water = waterfall("c4t")
 ch_dumb = dumbbell("c5t")
 free_w = pp[("Q2", "Free CRM")][2]
-free_val = free_w * 35
-ch_be = gap_bars("c6t", [
-    ("Paying customers / month", free_w, lost_wins, f0, f"{free_cr:.1f}% of Free CRM signups", f"{be_wins:.0f}% of Free CRM signups"),
-    ("Deal value / month", free_val, lost_mrr, lambda v: f"${v/1000:.1f}K", f"{free_cr:.1f}% conversion", f"{be_mrr:.0f}% conversion"),
-])
+neutral_cr = 100 * (w1 - trial_w2) / free_n   # Free CRM conversion that keeps total wins flat QoQ
 
 # ------------------------------------------------------------------ tables
 def table(head, rows, cls=""):
@@ -656,6 +652,7 @@ sup a {{ text-decoration:none; }}
   {ch_conv}
   {legend([(p, PC[p]) for p in ["Starter", "Pro", "Free CRM"]] + [("Blended (all signups)", "--ink-total")])}
 </figure>
+<p>For paying customers to stay flat QoQ ({f0(w1)}/month), Free CRM would need a signup-to-paid conversion of ~{neutral_cr:.0f}%, vs {free_cr:.1f}% today.</p>
 {t_prod}
 
 <h3>3. How much of the drop each factor explains</h3>
@@ -675,14 +672,6 @@ sup a {{ text-decoration:none; }}
 </figure>
 <p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
 <p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
-
-<h3>5. What Free CRM would need to convert to replace the trials it took</h3>
-<p>Starter and Pro trials lost ~{f0(lost_wins)} paying customers and ~${lost_mrr/1000:.1f}K in deal value per month. Free CRM brings back {f0(free_w)} paying customers (all upgrades go to Starter at $35). To fully make up the difference, Free CRM would need to convert ~{be_wins:.0f}% of its {f0(free_n)} monthly signups, vs {free_cr:.1f}% today.</p>
-<figure>
-  <figcaption><div class="t" id="c6t">Free CRM covers about a fifth of what the trials lost</div><div class="s">Track = what the trials lost per month (Q1 vs Q2). Fill = what Free CRM delivers today.</div></figcaption>
-  {ch_be}
-  {legend([("Free CRM today", "--s3"), ("Lost from Starter and Pro trials", "--track")])}
-</figure>
 
 <h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
 <p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
