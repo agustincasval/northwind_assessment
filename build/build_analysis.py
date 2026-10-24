@@ -480,7 +480,7 @@ sup a {{ text-decoration:none; }}
 <h2>What we found</h2>
 <ol class="findings">
   <li><b>The SKU mix shifted; signup-to-paid conversion by SKU didn't.</b> Starter went from {pct(100*pp[("Q1","Starter")][0]/n1)} of signups to {pct(100*pp[("Q2","Starter")][0]/n2)}, Pro from {pct(100*pp[("Q1","Pro")][0]/n1)} to {pct(100*pp[("Q2","Pro")][0]/n2)}, and Free CRM took {pct(100*free_n/n2)}. Signup-to-paid by SKU stayed flat (Starter {pp[("Q1","Starter")][1]:.0f}% → {pp[("Q2","Starter")][1]:.0f}%, Pro {pp[("Q1","Pro")][1]:.0f}% → {pp[("Q2","Pro")][1]:.0f}%<sup><a href="#pro">†</a></sup>).</li>
-  <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice, including visitors who land on the Starter trial page (67%) and on pricing (68%). If traffic quality were the cause, we'd see it concentrated in some channels and building gradually as Display grew from February. We don't, so hypothesis 2 is not the driver.</li>
+  <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice.</li>
   <li><b>Net signup growth is much smaller than Free CRM's volume.</b> Starter and Pro trial signups dropped by {f0(substitution)}/month and Free CRM grew by {f0(free_n)}, netting out at +{f0(net_new)} signups/month. That lift could be attributed to Free CRM, but not conclusively<sup><a href="#star">*</a></sup>.</li>
   <li><b>Free CRM upgrades go only to Starter.</b> All {fcrm_up[0]} Free CRM upgrades were to Starter ($35); none went to Pro. All happened within {fcrm_up[2]} days of signup.</li>
 </ol>
@@ -540,6 +540,7 @@ sup a {{ text-decoration:none; }}
   {ch_dumb}
   {legend([("Q1 (Jan–Mar)", "--q1"), ("Q2 (Apr–Jun)", "--q2")])}
 </figure>
+<p>If traffic quality were the cause, we'd expect the drop to be concentrated in some channels and to build gradually as Display grew from February. Instead it hits every slice at once, in April. Free CRM also takes 65–74% of Q2 signups everywhere, including visitors who land on the Starter trial page (67%) and on pricing (68%).</p>
 <p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
 
 <h3>6. Free CRM: substitution vs new demand, and what it would take to break even</h3>
