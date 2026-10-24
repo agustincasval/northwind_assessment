@@ -614,7 +614,7 @@ sup a {{ text-decoration:none; }}
 <h1>Why paying customers dropped while signups grew</h1>
 <div class="date">Northwind CRM · Self-serve funnel · Data Jan 1 – Jun 30, 2026</div>
 
-<p class="tldr">Paying customers dropped {100*(1-w2/w1):.0f}% after Free CRM launched ({f0(w1)} → {f0(w2)} per month), even though signups grew {100*(n2/n1-1):.0f}%. Signup-to-paid conversion by SKU didn't change. What changed is the SKU mix: Free CRM became the primary call-to-action across the site on Apr 1 and now takes {pct(100*free_n/n2)} of signups, but only {free_cr:.1f}% of them become paying customers, vs ~{pp[("Q2","Starter")][1]:.0f}% for Starter and Pro trials. The shift in SKU mix accounts for the drop.</p>
+<p class="tldr">Paying customers dropped {100*(1-w2/w1):.0f}% QoQ after Free CRM launched ({f0(w1)} → {f0(w2)} per month), even though signups grew {100*(n2/n1-1):.0f}% QoQ. Signup-to-paid conversion by SKU didn't change. What changed is the SKU mix: Free CRM became the primary call-to-action across the site on Apr 1 and now takes {pct(100*free_n/n2)} of signups, but only {free_cr:.1f}% of them become paying customers, vs ~{pp[("Q2","Starter")][1]:.0f}% for Starter and Pro trials. The shift in SKU mix accounts for the drop.</p>
 
 <div class="tiles">
   <div class="tile"><div class="l">Paying customers / month</div><div class="v"><span class="q">Q2:</span> {f0(w2)}</div><div class="d">Q1: {f0(w1)} · QoQ {100*(w2/w1-1):+.0f}%</div></div>
@@ -626,7 +626,7 @@ sup a {{ text-decoration:none; }}
 <h2>Data</h2>
 <p>We used {f0(n_sessions)} website sessions, {f0(n_signups)} signups and {f0(n_opps)} closed opportunities. Sessions and signups cover Jan 1 – Jun 30, 2026; opportunities run to {opp_end:%b %-d} so June signups have time to close. Signups are grouped by the month they signed up (cohorts) and compared as Q1 (Jan–Mar, before Free CRM) vs Q2 (Apr–Jun, after launch) using monthly averages. A paying customer is an opportunity with amount &gt; $0 closed within 30 days of signup. How the data was validated, cleaned and joined is in <a href="data-methodology.html">Data methodology</a>.</p>
 <h2>Problem</h2>
-<p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from {cr1:.0f}% to {cr2:.0f}% and paying customers dropped ~{100*(1-w2/w1):.0f}% ({f0(w1)} → {f0(w2)}/month), even as signups grew {100*(n2/n1-1):.0f}%. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
+<p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from {cr1:.0f}% to {cr2:.0f}% and paying customers dropped ~{100*(1-w2/w1):.0f}% QoQ ({f0(w1)} → {f0(w2)}/month), even as signups grew {100*(n2/n1-1):.0f}% QoQ. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
 
 <h2>Hypotheses</h2>
 <ol class="hyp">
@@ -637,12 +637,12 @@ sup a {{ text-decoration:none; }}
 <h2>What we found</h2>
 <ol class="findings">
   <li><b>The SKU mix shifted; signup-to-paid conversion by SKU didn't.</b> Starter went from {pct(100*pp[("Q1","Starter")][0]/n1)} of signups to {pct(100*pp[("Q2","Starter")][0]/n2)}, Pro from {pct(100*pp[("Q1","Pro")][0]/n1)} to {pct(100*pp[("Q2","Pro")][0]/n2)}, and Free CRM took {pct(100*free_n/n2)}. Signup-to-paid by SKU stayed flat (Starter {pp[("Q1","Starter")][1]:.0f}% → {pp[("Q2","Starter")][1]:.0f}%, Pro {pp[("Q1","Pro")][1]:.0f}% → {pp[("Q2","Pro")][1]:.0f}%<sup><a href="#pro">†</a></sup>).</li>
-  <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice. Signup quality doesn't explain the drop.</li>
-  <li><b>Net signup growth is much smaller than Free CRM's volume.</b> Starter and Pro trial signups dropped by {f0(substitution)}/month and Free CRM grew by {f0(free_n)}, netting out at +{f0(net_new)} signups/month. That lift could be attributed to Free CRM, but not conclusively<sup><a href="#star">*</a></sup>.</li>
+  <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp QoQ in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice. Signup quality doesn't explain the drop.</li>
+  <li><b>Net signup growth is much smaller than Free CRM's volume.</b> Starter and Pro trial signups dropped by {f0(substitution)}/month QoQ and Free CRM grew by {f0(free_n)}, netting out at +{f0(net_new)} signups/month QoQ. That lift could be attributed to Free CRM, but not conclusively<sup><a href="#star">*</a></sup>.</li>
   <li><b>Free CRM upgrades go only to Starter.</b> All {fcrm_up[0]} Free CRM upgrades were to Starter ($35); none went to Pro. All happened within {fcrm_up[2]} days of signup.</li>
-  <li><b>Traffic growth came almost entirely from low-converting sources.</b> Sessions grew {traffic_growth:.0f}%, and {low_sess_share:.0f}% of the new sessions came from Display and Direct. Those two channels brought only {low_sig_share:.0f}% of the new signups: Display turns fewer than 0.5% of visits into signups, and Direct's rate fell from 2.9% to 1.9% as its volume nearly doubled. This affects traffic efficiency, not the quality of the signups (finding 2).</li>
+  <li><b>Traffic growth came almost entirely from low-converting sources.</b> Sessions grew {traffic_growth:.0f}% QoQ, and {low_sess_share:.0f}% of the new sessions came from Display and Direct. Those two channels brought only {low_sig_share:.0f}% of the new signups: Display turns fewer than 0.5% of visits into signups, and Direct's rate fell from 2.9% to 1.9% as its volume nearly doubled. This affects traffic efficiency, not the quality of the signups (finding 2).</li>
 </ol>
-<p class="note-foot" id="star">* {f0(net_new)} net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew {traffic_growth:.0f}% (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
+<p class="note-foot" id="star">* {f0(net_new)} net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew {traffic_growth:.0f}% QoQ (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
 <p class="note-foot" id="pro">† Pro's Q1 average is lifted by January (38.6%). Feb–Jun Pro ranges 26–32%, in line with Q2.</p>
 
 <h2>Recommendations</h2>
