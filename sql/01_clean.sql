@@ -1,7 +1,7 @@
 -- =====================================================================
 -- 01_clean.sql — Northwind CRM: raw CSVs -> cleaned tables
 -- Engine: DuckDB (standard SQL; reads CSVs directly).
--- Every rule is numbered (R1..R13) and matches the data-validation doc.
+-- Every rule is numbered (R1..R14) and matches the data-validation doc.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -68,7 +68,9 @@ sized AS (
         * REPLACE (
             -- R5: company_size sentinels (-5, 999999) -> NULL
             CASE WHEN company_size < 1 OR company_size >= 999999 THEN NULL
-                 ELSE company_size END AS company_size
+                 ELSE company_size END AS company_size,
+            -- R14: geo holds the literal text 'N/A' in 25 rows (plus 25 true NULLs) -> NULL
+            NULLIF(trim(geo), 'N/A') AS geo
         )
     FROM dedup
 ),

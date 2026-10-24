@@ -7,9 +7,10 @@ Why are paying customers down while signups are up?
 | Path | What it is |
 |---|---|
 | `docs/` | Published site (GitHub Pages): analysis, executive readout, data methodology |
-| `sql/01_clean.sql` | Raw CSVs → cleaned tables. Rules R1–R13, each documented inline |
+| `sql/01_clean.sql` | Raw CSVs → cleaned tables. Rules R1–R14, each documented inline |
 | `sql/02_funnel.sql` | Funnel metrics: monthly cohorts, product split, origin slices, finance view |
 | `sql/03_decomposition.sql` | Kitagawa decomposition of the change in monthly wins (volume / mix / rate) |
+| `build/build_analysis.py` | Renders `docs/analysis.html` from the SQL tables (formatting and charts only; no analysis logic) |
 | `data/` | Raw extracts as received: `sessions.csv`, `signups.csv`, `opportunities.csv` |
 
 ## Reproduce

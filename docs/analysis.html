@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind CRM — Analysis</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg:#f9f9f7; --surface:#fcfcfb; --fg:#0b0b0b; --fg2:#52514e; --muted:#898781;
+  --line:#e1e0d9; --axis:#c3c2b7; --accent:#1c5cab; --callout:#eef4fc;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --ink-total:#6b6a66;
+  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
+    --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
+    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
+  --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
+  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width:780px; margin:0 auto; padding:48px 16px 96px; }
+a { color:var(--accent); }
+nav.crumbs { font-size:14px; color:var(--muted); margin-bottom:24px; }
+h1 { font-size:30px; line-height:1.2; letter-spacing:-0.01em; margin:0 0 6px; }
+.date { color:var(--muted); font-size:14px; margin-bottom:28px; }
+h2 { font-size:22px; margin:56px 0 12px; padding-top:20px; border-top:1px solid var(--line); }
+h3 { font-size:17px; margin:36px 0 6px; }
+h4 { font-size:15px; margin:28px 0 8px; }
+p, li { max-width:68ch; }
+.tldr { font-size:18px; line-height:1.55; }
+.tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:28px 0; }
+.tile { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+.tile .l { font-size:13px; color:var(--fg2); }
+.tile .v { font-size:24px; font-weight:600; margin-top:4px; }
+.tile .d { font-size:13px; color:var(--fg2); margin-top:2px; }
+@media (max-width:640px) { .tiles { grid-template-columns:repeat(2,1fr); } }
+.callout { background:var(--callout); border-radius:10px; padding:14px 18px; margin:24px 0; font-size:15px; }
+.callout b { display:block; margin-bottom:2px; }
+ol.findings > li { margin-bottom:16px; }
+.hyp li { margin-bottom:6px; }
+.verdict { font-size:13px; font-weight:600; padding:2px 8px; border-radius:999px; border:1px solid var(--line); margin-left:6px; white-space:nowrap; }
+figure { margin:24px 0 32px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 18px 12px; }
+figcaption .t { font-weight:600; font-size:15px; }
+figcaption .s { color:var(--fg2); font-size:14px; margin-top:2px; }
+figure svg { width:100%; height:auto; display:block; margin-top:12px; overflow:visible; }
+.legend { display:flex; flex-wrap:wrap; gap:14px; font-size:13px; color:var(--fg2); margin-top:10px; }
+.legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+.note-foot { font-size:13px; color:var(--fg2); margin-top:8px; }
+svg .grid { stroke:var(--line); stroke-width:1; }
+svg .axis { stroke:var(--axis); stroke-width:1; }
+svg .tick { fill:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+svg .val { fill:var(--fg2); font-size:12px; font-weight:600; }
+svg .end { fill:var(--fg2); font-size:12px; }
+svg .lab { fill:var(--fg2); font-size:12px; }
+svg .hdr { fill:var(--fg); font-size:12px; font-weight:600; }
+svg .note { fill:var(--muted); font-size:11px; }
+svg .marker { stroke:var(--axis); stroke-width:1; }
+svg .conn { stroke:var(--muted); stroke-width:1; }
+svg .bar-conn { stroke:var(--axis); stroke-width:2; }
+svg .ln { stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+svg .ln.blended { stroke-dasharray:5 4; }
+svg .dot { stroke:var(--surface); stroke-width:2; }
+svg [data-tip] { cursor:default; }
+svg [data-tip]:hover { opacity:.85; }
+#tip { position:fixed; pointer-events:none; background:var(--fg); color:var(--bg); font-size:12px; padding:6px 9px; border-radius:6px; max-width:300px; opacity:0; transition:opacity .08s; z-index:10; }
+.tbl { overflow-x:auto; margin:12px 0 20px; }
+table { border-collapse:collapse; width:100%; font-size:14px; font-variant-numeric:tabular-nums; }
+th, td { padding:7px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+th { font-size:12px; color:var(--fg2); font-weight:600; vertical-align:bottom; }
+th:first-child, td:first-child { text-align:left; }
+table.num th, table.num td { font-size:12.5px; padding:6px 7px; }
+table.kit td:nth-child(3), table.kit th:nth-child(3) { text-align:left; color:var(--fg2); }
+.sw { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:7px; }
+details { margin:12px 0; }
+summary { cursor:pointer; font-weight:600; }
+pre { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px; overflow-x:auto; font-size:12.5px; line-height:1.5; }
+.pending { border:1px dashed var(--axis); border-radius:10px; padding:16px 18px; color:var(--fg2); }
+sup a { text-decoration:none; }
+</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="./">Northwind CRM case</a> / Analysis</nav>
+<h1>Why paying customers dropped while signups grew</h1>
+<div class="date">Northwind CRM · Self-serve funnel · Data Jan 1 – Jun 30, 2026</div>
+
+<p class="tldr">Paying customers dropped 47% after Free CRM launched (316 → 168 per month), even though signups grew 25%. Conversion inside each paid trial didn't change. What changed is which plan people sign up for: Free CRM became the main CTA on Apr 1 and now takes 69% of signups, but only 4.7% of them become paying customers, vs ~29% for Starter and Pro trials. The plan mix explains the full drop.</p>
+
+<div class="tiles">
+  <div class="tile"><div class="l">Paying customers / month</div><div class="v">168</div><div class="d">from 316 · -47%</div></div>
+  <div class="tile"><div class="l">Signups / month</div><div class="v">1,359</div><div class="d">from 1,087 · +25%</div></div>
+  <div class="tile"><div class="l">Signup → paid</div><div class="v">12.3%</div><div class="d">from 29.0%</div></div>
+  <div class="tile"><div class="l">New MRR / month</div><div class="v">$9.5K</div><div class="d">from $16.3K · -42%</div></div>
+</div>
+
+<p>We looked at every self-serve signup between Jan 1 and Jun 30, 2026 (7,338 leads), joined to the website session that generated it and to its closed opportunity. A <b>paying customer</b> (or win) is an opportunity with amount &gt; $0 closed within 30 days of signup. We compare Q1 (Jan–Mar, before Free CRM) against Q2 (Apr–Jun, after launch) using monthly averages, and group signups by the month they signed up (cohorts), not by close date.</p>
+
+<div class="callout"><b>Data validation</b>The raw tables needed cleanup before we could trust them: duplicate rows, broken join keys, amounts recorded 1,000× too high, a sign bug in days to close, out-of-range dates and inconsistent channel labels. We applied 14 documented rules; under 2% of rows were affected. Results hold with and without $0 deals. Full detail in <a href="data-methodology.html">Data methodology</a>.</div>
+
+<h2>Problem</h2>
+<p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from 29% to 12% and paying customers dropped ~47% (316 → 168/month), even as signups grew 25%. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
+
+<h2>Hypotheses</h2>
+<ol class="hyp">
+  <li><b>Free CRM is cannibalizing Starter and Pro (plan mix shift).</b> People who used to start a paid trial now pick the free plan, which converts much less. <span class="verdict">Supported</span></li>
+  <li><b>Signup quality deteriorated (top of funnel).</b> Traffic nearly doubled, mostly from Display. If the new traffic brought lower-intent signups, conversion would fall regardless of plan. <span class="verdict">Not supported</span></li>
+</ol>
+
+<h2>What we found</h2>
+<ol class="findings">
+  <li><b>The plan mix shift drives the drop.</b> Starter went from 81% of signups to 19%, Pro from 19% to 12%, and Free CRM took 69%. Conversion inside each trial stayed flat (Starter 28% → 29%, Pro 34% → 29%<sup><a href="#pro">†</a></sup>). Decomposing the change in monthly wins, the mix shift takes away 201 wins/month, more signups add back 56, and conversion changes inside each plan account for -2.8. In other words, this is not a conversion problem, it's a plan mix problem.</li>
+  <li><b>The drop is the same across every top-of-funnel trait.</b> Channel, entry page, device, new vs returning visitor, company size and country all fall 12–22pp in signup-to-paid conversion, all in April, after a flat Q1. Free CRM takes 65–74% of Q2 signups in every slice, including visitors who land on the Starter trial page (67%) and on pricing (68%). If traffic quality were the cause, we'd see it concentrated in some channels and building gradually as Display grew from February. We don't, so hypothesis 2 is not the driver.</li>
+  <li><b>Most Free CRM signups replaced trial signups.</b> Trial signups fell by 660/month while Free CRM added 932. At most 271 of those (~29%) are net new signups<sup><a href="#star">*</a></sup>; the other ~71% are people who would likely have started a trial before.</li>
+  <li><b>Free CRM monetizes only into Starter, and only early.</b> All 132 Free CRM upgrades were to Starter ($35); none went to Pro. All happened within 29 days of signup (median 15). To replace the trial wins it cannibalized, Free CRM would need ~21% lifetime conversion (~26% to replace the MRR). It converts 4.7% today.</li>
+</ol>
+<p class="note-foot" id="star">* 271 net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew 44% (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
+<p class="note-foot" id="pro">† Pro's Q1 average is lifted by January (38.6%). Feb–Jun Pro ranges 26–32%, in line with Q2.</p>
+
+<h3>Limitations</h3>
+<ul>
+  <li><b>30-day visibility.</b> No opportunity in the extract closes more than 29 days after signup, for any plan, even for April cohorts with ~85 days of history. Either Free CRM users decide in month one or the extract only captures the first 30 days. A freemium plan usually converts over a longer period, so Free CRM's true lifetime conversion could be higher than 4.7%. Even so, it would need to be 4–5× higher to break even.</li>
+  <li><b>No product usage data.</b> Sessions are website visits, not product logins. We can't see activation or engagement inside Free CRM, so we can't tell why 95% of free users don't upgrade.</li>
+  <li><b>Direct traffic in June.</b> Direct jumps to 37% of sessions in June and its session-to-signup rate halves (3.0% → 1.3%). Likely a tracking or bot issue; it doesn't change the findings but should be checked.</li>
+</ul>
+
+<h2>Recommendations</h2>
+<div class="pending">Draft — recommendations to be added.</div>
+
+<h2>Analysis</h2>
+
+<h3>1. The funnel by signup month</h3>
+<p>Traffic and signups go up every month. Paying customers fall by half in April and stay there.</p>
+<div class="tbl"><table class="num"><thead><tr><th>Signup month</th><th>Sessions</th><th>Signups</th><th>Paid (30d)</th><th>New MRR (30d)</th><th>Session → signup</th><th>Signup → paid</th><th>Session → paid</th></tr></thead><tbody><tr><td>Jan</td><td>38,440</td><td>1,109</td><td>321</td><td>$17,460</td><td>2.89%</td><td>28.9%</td><td>0.84%</td></tr><tr><td>Feb</td><td>38,152</td><td>1,054</td><td>322</td><td>$15,770</td><td>2.76%</td><td>30.6%</td><td>0.84%</td></tr><tr><td>Mar</td><td>49,304</td><td>1,099</td><td>304</td><td>$15,590</td><td>2.23%</td><td>27.7%</td><td>0.62%</td></tr><tr><td>Apr</td><td>52,148</td><td>1,339</td><td>151</td><td>$8,435</td><td>2.57%</td><td>11.3%</td><td>0.29%</td></tr><tr><td>May</td><td>58,887</td><td>1,324</td><td>169</td><td>$9,515</td><td>2.25%</td><td>12.8%</td><td>0.29%</td></tr><tr><td>Jun</td><td>70,784</td><td>1,413</td><td>183</td><td>$10,455</td><td>2.00%</td><td>13.0%</td><td>0.26%</td></tr></tbody></table></div>
+
+<h3>2. Free CRM took two thirds of signups from day one</h3>
+<figure>
+  <figcaption><div class="t" id="c1t">Signups per month by plan</div><div class="s">The mix flips on Apr 1 and stays stable after.</div></figcaption>
+  <svg viewBox="0 0 680 260" role="img" aria-labelledby="c1t"><line class="grid" x1="44" x2="664" y1="232.0" y2="232.0"/><text class="tick" x="36" y="236.0" text-anchor="end">0</text><line class="grid" x1="44" x2="664" y1="158.7" y2="158.7"/><text class="tick" x="36" y="162.7" text-anchor="end">500</text><line class="grid" x1="44" x2="664" y1="85.3" y2="85.3"/><text class="tick" x="36" y="89.3" text-anchor="end">1,000</text><line class="grid" x1="44" x2="664" y1="12.0" y2="12.0"/><text class="tick" x="36" y="16.0" text-anchor="end">1,500</text><path d="M76.5,100.9 H114.9 V232.0 H76.5 Z" fill="var(--s1)" data-tip="Jan · Starter: 894 (81%)"/><path d="M76.5,98.9 V73.3 Q76.5,69.3 80.5,69.3 H110.9 Q114.9,69.3 114.9,73.3 V98.9 Z" fill="var(--s2)" data-tip="Jan · Pro: 215 (19%)"/><text class="val" x="95.7" y="63.3" text-anchor="middle">1,109</text><text class="tick" x="95.7" y="252" text-anchor="middle">Jan</text><path d="M179.8,105.6 H218.2 V232.0 H179.8 Z" fill="var(--s1)" data-tip="Feb · Starter: 862 (82%)"/><path d="M179.8,103.6 V81.4 Q179.8,77.4 183.8,77.4 H214.2 Q218.2,77.4 218.2,81.4 V103.6 Z" fill="var(--s2)" data-tip="Feb · Pro: 192 (18%)"/><text class="val" x="199.0" y="71.4" text-anchor="middle">1,054</text><text class="tick" x="199.0" y="252" text-anchor="middle">Feb</text><path d="M283.1,101.9 H321.5 V232.0 H283.1 Z" fill="var(--s1)" data-tip="Mar · Starter: 887 (81%)"/><path d="M283.1,99.9 V74.8 Q283.1,70.8 287.1,70.8 H317.5 Q321.5,70.8 321.5,74.8 V99.9 Z" fill="var(--s2)" data-tip="Mar · Pro: 212 (19%)"/><text class="val" x="302.3" y="64.8" text-anchor="middle">1,099</text><text class="tick" x="302.3" y="252" text-anchor="middle">Mar</text><path d="M386.5,195.0 H424.9 V232.0 H386.5 Z" fill="var(--s1)" data-tip="Apr · Starter: 252 (19%)"/><path d="M386.5,171.1 H424.9 V193.0 H386.5 Z" fill="var(--s2)" data-tip="Apr · Pro: 163 (12%)"/><path d="M386.5,169.1 V39.6 Q386.5,35.6 390.5,35.6 H420.9 Q424.9,35.6 424.9,39.6 V169.1 Z" fill="var(--s3)" data-tip="Apr · Free CRM: 924 (69%)"/><text class="val" x="405.7" y="29.6" text-anchor="middle">1,339</text><text class="tick" x="405.7" y="252" text-anchor="middle">Apr</text><path d="M489.8,195.0 H528.2 V232.0 H489.8 Z" fill="var(--s1)" data-tip="May · Starter: 252 (19%)"/><path d="M489.8,170.8 H528.2 V193.0 H489.8 Z" fill="var(--s2)" data-tip="May · Pro: 165 (12%)"/><path d="M489.8,168.8 V41.8 Q489.8,37.8 493.8,37.8 H524.2 Q528.2,37.8 528.2,41.8 V168.8 Z" fill="var(--s3)" data-tip="May · Free CRM: 907 (69%)"/><text class="val" x="509.0" y="31.8" text-anchor="middle">1,324</text><text class="tick" x="509.0" y="252" text-anchor="middle">May</text><path d="M593.1,190.9 H631.5 V232.0 H593.1 Z" fill="var(--s1)" data-tip="Jun · Starter: 280 (20%)"/><path d="M593.1,166.1 H631.5 V188.9 H593.1 Z" fill="var(--s2)" data-tip="Jun · Pro: 169 (12%)"/><path d="M593.1,164.1 V28.8 Q593.1,24.8 597.1,24.8 H627.5 Q631.5,24.8 631.5,28.8 V164.1 Z" fill="var(--s3)" data-tip="Jun · Free CRM: 964 (68%)"/><text class="val" x="612.3" y="18.8" text-anchor="middle">1,413</text><text class="tick" x="612.3" y="252" text-anchor="middle">Jun</text><line class="axis" x1="44" x2="664" y1="232.0" y2="232.0"/></svg>
+  <div class="legend"><span><i style="background:var(--s1)"></i>Starter</span><span><i style="background:var(--s2)"></i>Pro</span><span><i style="background:var(--s3)"></i>Free CRM</span></div>
+</figure>
+<figure>
+  <figcaption><div class="t" id="c2t">Paying customers per month by plan signed up for</div><div class="s">Cohort view: wins within 30 days, grouped by signup month.</div></figcaption>
+  <svg viewBox="0 0 680 260" role="img" aria-labelledby="c2t"><line class="grid" x1="44" x2="664" y1="232.0" y2="232.0"/><text class="tick" x="36" y="236.0" text-anchor="end">0</text><line class="grid" x1="44" x2="664" y1="177.0" y2="177.0"/><text class="tick" x="36" y="181.0" text-anchor="end">100</text><line class="grid" x1="44" x2="664" y1="122.0" y2="122.0"/><text class="tick" x="36" y="126.0" text-anchor="end">200</text><line class="grid" x1="44" x2="664" y1="67.0" y2="67.0"/><text class="tick" x="36" y="71.0" text-anchor="end">300</text><line class="grid" x1="44" x2="664" y1="12.0" y2="12.0"/><text class="tick" x="36" y="16.0" text-anchor="end">400</text><path d="M76.5,101.1 H114.9 V232.0 H76.5 Z" fill="var(--s1)" data-tip="Jan · Starter: 238 (74%)"/><path d="M76.5,99.1 V59.5 Q76.5,55.5 80.5,55.5 H110.9 Q114.9,55.5 114.9,59.5 V99.1 Z" fill="var(--s2)" data-tip="Jan · Pro: 83 (26%)"/><text class="val" x="95.7" y="49.5" text-anchor="middle">321</text><text class="tick" x="95.7" y="252" text-anchor="middle">Jan</text><path d="M179.8,87.9 H218.2 V232.0 H179.8 Z" fill="var(--s1)" data-tip="Feb · Starter: 262 (81%)"/><path d="M179.8,85.9 V58.9 Q179.8,54.9 183.8,54.9 H214.2 Q218.2,54.9 218.2,58.9 V85.9 Z" fill="var(--s2)" data-tip="Feb · Pro: 60 (19%)"/><text class="val" x="199.0" y="48.9" text-anchor="middle">322</text><text class="tick" x="199.0" y="252" text-anchor="middle">Feb</text><path d="M283.1,101.1 H321.5 V232.0 H283.1 Z" fill="var(--s1)" data-tip="Mar · Starter: 238 (78%)"/><path d="M283.1,99.1 V68.8 Q283.1,64.8 287.1,64.8 H317.5 Q321.5,64.8 321.5,68.8 V99.1 Z" fill="var(--s2)" data-tip="Mar · Pro: 66 (22%)"/><text class="val" x="302.3" y="58.8" text-anchor="middle">304</text><text class="tick" x="302.3" y="252" text-anchor="middle">Mar</text><path d="M386.5,194.1 H424.9 V232.0 H386.5 Z" fill="var(--s1)" data-tip="Apr · Starter: 69 (46%)"/><path d="M386.5,170.9 H424.9 V192.1 H386.5 Z" fill="var(--s2)" data-tip="Apr · Pro: 42 (28%)"/><path d="M386.5,168.9 V153.0 Q386.5,149.0 390.5,149.0 H420.9 Q424.9,149.0 424.9,153.0 V168.9 Z" fill="var(--s3)" data-tip="Apr · Free CRM: 40 (26%)"/><text class="val" x="405.7" y="143.0" text-anchor="middle">151</text><text class="tick" x="405.7" y="252" text-anchor="middle">Apr</text><path d="M489.8,192.9 H528.2 V232.0 H489.8 Z" fill="var(--s1)" data-tip="May · Starter: 71 (42%)"/><path d="M489.8,166.6 H528.2 V190.9 H489.8 Z" fill="var(--s2)" data-tip="May · Pro: 48 (28%)"/><path d="M489.8,164.6 V143.1 Q489.8,139.1 493.8,139.1 H524.2 Q528.2,139.1 528.2,143.1 V164.6 Z" fill="var(--s3)" data-tip="May · Free CRM: 50 (30%)"/><text class="val" x="509.0" y="133.1" text-anchor="middle">169</text><text class="tick" x="509.0" y="252" text-anchor="middle">May</text><path d="M593.1,184.2 H631.5 V232.0 H593.1 Z" fill="var(--s1)" data-tip="Jun · Starter: 87 (48%)"/><path d="M593.1,154.4 H631.5 V182.2 H593.1 Z" fill="var(--s2)" data-tip="Jun · Pro: 54 (30%)"/><path d="M593.1,152.4 V135.3 Q593.1,131.3 597.1,131.3 H627.5 Q631.5,131.3 631.5,135.3 V152.4 Z" fill="var(--s3)" data-tip="Jun · Free CRM: 42 (23%)"/><text class="val" x="612.3" y="125.3" text-anchor="middle">183</text><text class="tick" x="612.3" y="252" text-anchor="middle">Jun</text><line class="axis" x1="44" x2="664" y1="232.0" y2="232.0"/></svg>
+  <div class="legend"><span><i style="background:var(--s1)"></i>Starter</span><span><i style="background:var(--s2)"></i>Pro</span><span><i style="background:var(--s3)"></i>Free CRM</span></div>
+</figure>
+
+<h3>3. Conversion inside each plan didn't move</h3>
+<figure>
+  <figcaption><div class="t" id="c3t">Signup → paid conversion by plan</div><div class="s">Starter and Pro hold at ~26–32%. The blended rate falls because Free CRM, at ~5%, is now most of the volume.</div></figcaption>
+  <svg viewBox="0 0 680 260" role="img" aria-labelledby="c3t"><line class="grid" x1="44" x2="588" y1="232.0" y2="232.0"/><text class="tick" x="36" y="236.0" text-anchor="end">0%</text><line class="grid" x1="44" x2="588" y1="178.0" y2="178.0"/><text class="tick" x="36" y="182.0" text-anchor="end">10%</text><line class="grid" x1="44" x2="588" y1="124.0" y2="124.0"/><text class="tick" x="36" y="128.0" text-anchor="end">20%</text><line class="grid" x1="44" x2="588" y1="70.0" y2="70.0"/><text class="tick" x="36" y="74.0" text-anchor="end">30%</text><line class="grid" x1="44" x2="588" y1="16.0" y2="16.0"/><text class="tick" x="36" y="20.0" text-anchor="end">40%</text><line class="marker" x1="316.0" x2="316.0" y1="16" y2="232"/><text class="note" x="322.0" y="26">Free CRM launch</text><path d="M44.0,88.4 L152.8,67.8 L261.6,87.3 L370.4,84.0 L479.2,79.7 L588.0,64.1" fill="none" stroke="var(--s1)" class="ln"/><circle cx="44.0" cy="88.4" r="4" fill="var(--s1)" class="dot" data-tip="Jan · Starter: 26.6%"/><circle cx="152.8" cy="67.8" r="4" fill="var(--s1)" class="dot" data-tip="Feb · Starter: 30.4%"/><circle cx="261.6" cy="87.3" r="4" fill="var(--s1)" class="dot" data-tip="Mar · Starter: 26.8%"/><circle cx="370.4" cy="84.0" r="4" fill="var(--s1)" class="dot" data-tip="Apr · Starter: 27.4%"/><circle cx="479.2" cy="79.7" r="4" fill="var(--s1)" class="dot" data-tip="May · Starter: 28.2%"/><circle cx="588.0" cy="64.1" r="4" fill="var(--s1)" class="dot" data-tip="Jun · Starter: 31.1%"/><path d="M44.0,23.6 L152.8,63.0 L261.6,64.1 L370.4,92.7 L479.2,74.9 L588.0,59.2" fill="none" stroke="var(--s2)" class="ln"/><circle cx="44.0" cy="23.6" r="4" fill="var(--s2)" class="dot" data-tip="Jan · Pro: 38.6%"/><circle cx="152.8" cy="63.0" r="4" fill="var(--s2)" class="dot" data-tip="Feb · Pro: 31.3%"/><circle cx="261.6" cy="64.1" r="4" fill="var(--s2)" class="dot" data-tip="Mar · Pro: 31.1%"/><circle cx="370.4" cy="92.7" r="4" fill="var(--s2)" class="dot" data-tip="Apr · Pro: 25.8%"/><circle cx="479.2" cy="74.9" r="4" fill="var(--s2)" class="dot" data-tip="May · Pro: 29.1%"/><circle cx="588.0" cy="59.2" r="4" fill="var(--s2)" class="dot" data-tip="Jun · Pro: 32.0%"/><path d="M370.4,208.8 L479.2,202.3 L588.0,208.2" fill="none" stroke="var(--s3)" class="ln"/><circle cx="370.4" cy="208.8" r="4" fill="var(--s3)" class="dot" data-tip="Apr · Free CRM: 4.3%"/><circle cx="479.2" cy="202.3" r="4" fill="var(--s3)" class="dot" data-tip="May · Free CRM: 5.5%"/><circle cx="588.0" cy="208.2" r="4" fill="var(--s3)" class="dot" data-tip="Jun · Free CRM: 4.4%"/><path d="M44.0,75.9 L152.8,66.8 L261.6,82.4 L370.4,171.0 L479.2,162.9 L588.0,161.8" fill="none" stroke="var(--ink-total)" class="ln blended"/><circle cx="44.0" cy="75.9" r="4" fill="var(--ink-total)" class="dot" data-tip="Jan · Blended: 28.9%"/><circle cx="152.8" cy="66.8" r="4" fill="var(--ink-total)" class="dot" data-tip="Feb · Blended: 30.6%"/><circle cx="261.6" cy="82.4" r="4" fill="var(--ink-total)" class="dot" data-tip="Mar · Blended: 27.7%"/><circle cx="370.4" cy="171.0" r="4" fill="var(--ink-total)" class="dot" data-tip="Apr · Blended: 11.3%"/><circle cx="479.2" cy="162.9" r="4" fill="var(--ink-total)" class="dot" data-tip="May · Blended: 12.8%"/><circle cx="588.0" cy="161.8" r="4" fill="var(--ink-total)" class="dot" data-tip="Jun · Blended: 13.0%"/><text class="end" x="598.0" y="63.2">Pro 32.0%</text><text class="end" x="598.0" y="77.2">Starter 31.1%</text><text class="end" x="598.0" y="165.8">Blended 13.0%</text><text class="end" x="598.0" y="212.2">Free CRM 4.4%</text><text class="tick" x="44.0" y="252" text-anchor="middle">Jan</text><text class="tick" x="152.8" y="252" text-anchor="middle">Feb</text><text class="tick" x="261.6" y="252" text-anchor="middle">Mar</text><text class="tick" x="370.4" y="252" text-anchor="middle">Apr</text><text class="tick" x="479.2" y="252" text-anchor="middle">May</text><text class="tick" x="588.0" y="252" text-anchor="middle">Jun</text><line class="axis" x1="44" x2="588" y1="232.0" y2="232.0"/></svg>
+  <div class="legend"><span><i style="background:var(--s1)"></i>Starter</span><span><i style="background:var(--s2)"></i>Pro</span><span><i style="background:var(--s3)"></i>Free CRM</span><span><i style="background:var(--ink-total)"></i>Blended (all signups)</span></div>
+</figure>
+<div class="tbl"><table class="num"><thead><tr><th>Plan</th><th>Signups/mo Q1</th><th>Signups/mo Q2</th><th>Mix Q1</th><th>Mix Q2</th><th>Conv. Q1</th><th>Conv. Q2</th><th>Paid/mo Q1</th><th>Paid/mo Q2</th></tr></thead><tbody><tr><td><i class="sw" style="background:var(--s1)"></i>Starter</td><td>881</td><td>261</td><td>81%</td><td>19%</td><td>27.9%</td><td>29.0%</td><td>246</td><td>76</td></tr><tr><td><i class="sw" style="background:var(--s2)"></i>Pro</td><td>206</td><td>166</td><td>19%</td><td>12%</td><td>33.8%</td><td>29.0%</td><td>70</td><td>48</td></tr><tr><td><i class="sw" style="background:var(--s3)"></i>Free CRM</td><td>—</td><td>932</td><td>—</td><td>69%</td><td>—</td><td>4.7%</td><td>—</td><td>44</td></tr><tr><td><b>All signups</b></td><td>1,087</td><td>1,359</td><td>100%</td><td>100%</td><td><b>29.0%</b></td><td><b>12.3%</b></td><td><b>316</b></td><td><b>168</b></td></tr></tbody></table></div>
+<p>This is a textbook case of Simpson's paradox: the overall rate falls even though no group's rate falls, because the weight of each group changes.</p>
+
+<h3>4. How much of the drop each factor explains</h3>
+<p>We split the change in monthly paying customers into three parts (Kitagawa decomposition): <b>volume</b> (more signups), <b>mix</b> (which plan they choose) and <b>rate</b> (conversion inside each plan). The three parts add up exactly to the total change.</p>
+<figure>
+  <figcaption><div class="t" id="c4t">From 316 to 168 paying customers per month</div><div class="s">Blue adds wins, red takes them away. Q1 vs Q2 monthly averages.</div></figcaption>
+  <svg viewBox="0 0 680 300" role="img" aria-labelledby="c4t"><line class="grid" x1="44" x2="664" y1="236.0" y2="236.0"/><text class="tick" x="36" y="240.0" text-anchor="end">0</text><line class="grid" x1="44" x2="664" y1="183.0" y2="183.0"/><text class="tick" x="36" y="187.0" text-anchor="end">100</text><line class="grid" x1="44" x2="664" y1="130.0" y2="130.0"/><text class="tick" x="36" y="134.0" text-anchor="end">200</text><line class="grid" x1="44" x2="664" y1="77.0" y2="77.0"/><text class="tick" x="36" y="81.0" text-anchor="end">300</text><line class="grid" x1="44" x2="664" y1="24.0" y2="24.0"/><text class="tick" x="36" y="28.0" text-anchor="end">400</text><rect x="68.3" y="68.7" width="40.0" height="167.3" rx="3" fill="var(--ink-total)" data-tip="Q1 wins / month: 315.7 wins/month"/><text class="val" x="88.3" y="62.7" text-anchor="middle">316</text><text class="tick" x="88.3" y="252" text-anchor="middle">Q1 wins /</text><text class="tick" x="88.3" y="265" text-anchor="middle">month</text><rect x="156.9" y="38.9" width="40.0" height="29.7" rx="3" fill="var(--pos)" data-tip="More signups (volume): +56.1 wins/month"/><line class="conn" x1="108.3" x2="156.9" y1="68.7" y2="68.7"/><text class="val" x="176.9" y="32.9" text-anchor="middle">+56</text><text class="tick" x="176.9" y="252" text-anchor="middle">More signups</text><text class="tick" x="176.9" y="265" text-anchor="middle">(volume)</text><rect x="245.4" y="38.9" width="40.0" height="113.9" rx="3" fill="var(--neg)" data-tip="Mix: fewer Starter trials: −214.9 wins/month"/><line class="conn" x1="196.9" x2="245.4" y1="38.9" y2="38.9"/><text class="val" x="265.4" y="32.9" text-anchor="middle">−215</text><text class="tick" x="265.4" y="252" text-anchor="middle">Mix: fewer</text><text class="tick" x="265.4" y="265" text-anchor="middle">Starter trials</text><rect x="334.0" y="152.8" width="40.0" height="13.8" rx="3" fill="var(--neg)" data-tip="Mix: fewer Pro trials: −26.0 wins/month"/><line class="conn" x1="285.4" x2="334.0" y1="152.8" y2="152.8"/><text class="val" x="354.0" y="146.8" text-anchor="middle">−26</text><text class="tick" x="354.0" y="252" text-anchor="middle">Mix: fewer Pro</text><text class="tick" x="354.0" y="265" text-anchor="middle">trials</text><rect x="422.6" y="145.6" width="40.0" height="21.0" rx="3" fill="var(--pos)" data-tip="Mix: Free CRM upgrades: +39.6 wins/month"/><line class="conn" x1="374.0" x2="422.6" y1="166.6" y2="166.6"/><text class="val" x="442.6" y="139.6" text-anchor="middle">+40</text><text class="tick" x="442.6" y="252" text-anchor="middle">Mix: Free CRM</text><text class="tick" x="442.6" y="265" text-anchor="middle">upgrades</text><rect x="511.1" y="145.6" width="40.0" height="1.5" rx="3" fill="var(--neg)" data-tip="Conversion within each plan: −2.8 wins/month"/><line class="conn" x1="462.6" x2="511.1" y1="145.6" y2="145.6"/><text class="val" x="531.1" y="139.6" text-anchor="middle">−3</text><text class="tick" x="531.1" y="252" text-anchor="middle">Conversion</text><text class="tick" x="531.1" y="265" text-anchor="middle">within each</text><text class="tick" x="531.1" y="278" text-anchor="middle">plan</text><rect x="599.7" y="147.1" width="40.0" height="88.9" rx="3" fill="var(--ink-total)" data-tip="Q2 wins / month: 167.7 wins/month"/><line class="conn" x1="551.1" x2="599.7" y1="147.1" y2="147.1"/><text class="val" x="619.7" y="141.1" text-anchor="middle">168</text><text class="tick" x="619.7" y="252" text-anchor="middle">Q2 wins /</text><text class="tick" x="619.7" y="265" text-anchor="middle">month</text><line class="axis" x1="44" x2="664" y1="236.0" y2="236.0"/></svg>
+  <div class="legend"><span><i style="background:var(--pos)"></i>Increase</span><span><i style="background:var(--neg)"></i>Decrease</span><span><i style="background:var(--ink-total)"></i>Total</span></div>
+</figure>
+<div class="tbl"><table class="kit"><thead><tr><th>Step</th><th>Wins / month</th><th>What it means</th></tr></thead><tbody><tr><td>Q1 baseline</td><td>315.7</td><td>Average paying customers per month, Jan–Mar</td></tr><tr><td>Volume effect</td><td>+56.1</td><td>More signups at the average conversion</td></tr><tr><td>Mix effect</td><td>-201.3</td><td>Signups moving from trials to Free CRM</td></tr><tr><td>&nbsp;&nbsp;↳ Starter</td><td>-214.9</td><td></td></tr><tr><td>&nbsp;&nbsp;↳ Pro</td><td>-26.0</td><td></td></tr><tr><td>&nbsp;&nbsp;↳ Free CRM</td><td>+39.6</td><td></td></tr><tr><td>Rate effect</td><td>-2.8</td><td>Change in conversion inside each plan</td></tr><tr><td>&nbsp;&nbsp;↳ Starter</td><td>+6.3</td><td></td></tr><tr><td>&nbsp;&nbsp;↳ Pro</td><td>-9.1</td><td></td></tr><tr><td>Q2</td><td>167.7</td><td>Average paying customers per month, Apr–Jun</td></tr></tbody></table></div>
+<p class="note-foot">Assumption: Free CRM didn't exist in Q1, so it has no Q1 conversion rate. We use its Q2 rate for both periods, which puts its whole effect in mix. Query: <a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>.</p>
+
+<h3>5. The drop is the same for every type of signup</h3>
+<figure>
+  <figcaption><div class="t" id="c5t">Signup → paid conversion, Q1 vs Q2, by origin</div><div class="s">Every slice drops by a similar amount, close to the overall average. Hover for Free CRM share and sample size.</div></figcaption>
+  <svg viewBox="0 0 680 846" role="img" aria-labelledby="c5t"><line class="grid" x1="150.0" x2="150.0" y1="22" y2="822"/><text class="tick" x="150.0" y="838" text-anchor="middle">0%</text><line class="grid" x1="277.5" x2="277.5" y1="22" y2="822"/><text class="tick" x="277.5" y="838" text-anchor="middle">10%</text><line class="grid" x1="405.0" x2="405.0" y1="22" y2="822"/><text class="tick" x="405.0" y="838" text-anchor="middle">20%</text><line class="grid" x1="532.5" x2="532.5" y1="22" y2="822"/><text class="tick" x="532.5" y="838" text-anchor="middle">30%</text><line class="grid" x1="660.0" x2="660.0" y1="22" y2="822"/><text class="tick" x="660.0" y="838" text-anchor="middle">40%</text><text class="tick" x="520.1" y="16" text-anchor="middle">Q1 avg 29%</text><line class="marker" x1="520.1" x2="520.1" y1="22" y2="822"/><text class="tick" x="307.3" y="16" text-anchor="middle">Q2 avg 12%</text><line class="marker" x1="307.3" x2="307.3" y1="22" y2="822"/><text class="hdr" x="8" y="45">Channel</text><text class="lab" x="140" y="69.0" text-anchor="end">Social</text><line class="bar-conn" x1="353.3" x2="575.0" y1="65.0" y2="65.0"/><circle cx="575.0" cy="65.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Social: Q1 33.3% → Q2 15.9% (-17.4pp) · Q2 Free CRM share 71% · n=237"/><circle cx="353.3" cy="65.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Social: Q1 33.3% → Q2 15.9% (-17.4pp) · Q2 Free CRM share 71% · n=237"/><text class="lab" x="140" y="91.0" text-anchor="end">Direct</text><line class="bar-conn" x1="285.2" x2="538.4" y1="87.0" y2="87.0"/><circle cx="538.4" cy="87.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Direct: Q1 30.5% → Q2 10.6% (-19.9pp) · Q2 Free CRM share 69% · n=1,698"/><circle cx="285.2" cy="87.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Direct: Q1 30.5% → Q2 10.6% (-19.9pp) · Q2 Free CRM share 69% · n=1,698"/><text class="lab" x="140" y="113.0" text-anchor="end">Organic Search</text><line class="bar-conn" x1="301.9" x2="531.6" y1="109.0" y2="109.0"/><circle cx="531.6" cy="109.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Organic Search: Q1 29.9% → Q2 11.9% (-18.0pp) · Q2 Free CRM share 68% · n=1,869"/><circle cx="301.9" cy="109.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Organic Search: Q1 29.9% → Q2 11.9% (-18.0pp) · Q2 Free CRM share 68% · n=1,869"/><text class="lab" x="140" y="135.0" text-anchor="end">Email</text><line class="bar-conn" x1="355.7" x2="530.4" y1="131.0" y2="131.0"/><circle cx="530.4" cy="131.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Email: Q1 29.8% → Q2 16.1% (-13.7pp) · Q2 Free CRM share 67% · n=802"/><circle cx="355.7" cy="131.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Email: Q1 29.8% → Q2 16.1% (-13.7pp) · Q2 Free CRM share 67% · n=802"/><text class="lab" x="140" y="157.0" text-anchor="end">Paid Search</text><line class="bar-conn" x1="315.5" x2="497.3" y1="153.0" y2="153.0"/><circle cx="497.3" cy="153.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Paid Search: Q1 27.2% → Q2 13.0% (-14.3pp) · Q2 Free CRM share 68% · n=1,801"/><circle cx="315.5" cy="153.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Paid Search: Q1 27.2% → Q2 13.0% (-14.3pp) · Q2 Free CRM share 68% · n=1,801"/><text class="lab" x="140" y="179.0" text-anchor="end">Referral</text><line class="bar-conn" x1="296.6" x2="485.8" y1="175.0" y2="175.0"/><circle cx="485.8" cy="175.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Referral: Q1 26.3% → Q2 11.5% (-14.8pp) · Q2 Free CRM share 70% · n=594"/><circle cx="296.6" cy="175.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Referral: Q1 26.3% → Q2 11.5% (-14.8pp) · Q2 Free CRM share 70% · n=594"/><text class="lab" x="140" y="201.0" text-anchor="end">Display</text><line class="bar-conn" x1="283.1" x2="468.8" y1="197.0" y2="197.0"/><circle cx="468.8" cy="197.0" r="5" fill="var(--q1)" class="dot" data-tip="Channel · Display: Q1 25.0% → Q2 10.4% (-14.6pp) · Q2 Free CRM share 71% · n=337"/><circle cx="283.1" cy="197.0" r="5" fill="var(--q2)" class="dot" data-tip="Channel · Display: Q1 25.0% → Q2 10.4% (-14.6pp) · Q2 Free CRM share 71% · n=337"/><text class="hdr" x="8" y="221">Entry page</text><text class="lab" x="140" y="245.0" text-anchor="end">Campaign landing page</text><line class="bar-conn" x1="280.3" x2="559.0" y1="241.0" y2="241.0"/><circle cx="559.0" cy="241.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Campaign landing page: Q1 32.1% → Q2 10.2% (-21.9pp) · Q2 Free CRM share 74% · n=384"/><circle cx="280.3" cy="241.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Campaign landing page: Q1 32.1% → Q2 10.2% (-21.9pp) · Q2 Free CRM share 74% · n=384"/><text class="lab" x="140" y="267.0" text-anchor="end">Free CRM landing page</text><line class="bar-conn" x1="331.6" x2="539.2" y1="263.0" y2="263.0"/><circle cx="539.2" cy="263.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Free CRM landing page: Q1 30.5% → Q2 14.2% (-16.3pp) · Q2 Free CRM share 65% · n=600"/><circle cx="331.6" cy="263.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Free CRM landing page: Q1 30.5% → Q2 14.2% (-16.3pp) · Q2 Free CRM share 65% · n=600"/><text class="lab" x="140" y="289.0" text-anchor="end">Pricing</text><line class="bar-conn" x1="301.7" x2="536.4" y1="285.0" y2="285.0"/><circle cx="536.4" cy="285.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Pricing: Q1 30.3% → Q2 11.9% (-18.4pp) · Q2 Free CRM share 68% · n=1,498"/><circle cx="301.7" cy="285.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Pricing: Q1 30.3% → Q2 11.9% (-18.4pp) · Q2 Free CRM share 68% · n=1,498"/><text class="lab" x="140" y="311.0" text-anchor="end">Content (blog, guides)</text><line class="bar-conn" x1="304.7" x2="524.5" y1="307.0" y2="307.0"/><circle cx="524.5" cy="307.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Content (blog, guides): Q1 29.4% → Q2 12.1% (-17.2pp) · Q2 Free CRM share 69% · n=1,547"/><circle cx="304.7" cy="307.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Content (blog, guides): Q1 29.4% → Q2 12.1% (-17.2pp) · Q2 Free CRM share 69% · n=1,547"/><text class="lab" x="140" y="333.0" text-anchor="end">Home</text><line class="bar-conn" x1="296.2" x2="510.4" y1="329.0" y2="329.0"/><circle cx="510.4" cy="329.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Home: Q1 28.3% → Q2 11.5% (-16.8pp) · Q2 Free CRM share 70% · n=1,557"/><circle cx="296.2" cy="329.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Home: Q1 28.3% → Q2 11.5% (-16.8pp) · Q2 Free CRM share 70% · n=1,557"/><text class="lab" x="140" y="355.0" text-anchor="end">Starter trial landing page</text><line class="bar-conn" x1="292.8" x2="509.6" y1="351.0" y2="351.0"/><circle cx="509.6" cy="351.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Starter trial landing page: Q1 28.2% → Q2 11.2% (-17.0pp) · Q2 Free CRM share 67% · n=203"/><circle cx="292.8" cy="351.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Starter trial landing page: Q1 28.2% → Q2 11.2% (-17.0pp) · Q2 Free CRM share 67% · n=203"/><text class="lab" x="140" y="377.0" text-anchor="end">Product / features</text><line class="bar-conn" x1="327.7" x2="500.5" y1="373.0" y2="373.0"/><circle cx="500.5" cy="373.0" r="5" fill="var(--q1)" class="dot" data-tip="Entry page · Product / features: Q1 27.5% → Q2 13.9% (-13.6pp) · Q2 Free CRM share 68% · n=1,524"/><circle cx="327.7" cy="373.0" r="5" fill="var(--q2)" class="dot" data-tip="Entry page · Product / features: Q1 27.5% → Q2 13.9% (-13.6pp) · Q2 Free CRM share 68% · n=1,524"/><text class="hdr" x="8" y="397">Device</text><text class="lab" x="140" y="421.0" text-anchor="end">Mobile</text><line class="bar-conn" x1="300.3" x2="526.4" y1="417.0" y2="417.0"/><circle cx="526.4" cy="417.0" r="5" fill="var(--q1)" class="dot" data-tip="Device · Mobile: Q1 29.5% → Q2 11.8% (-17.7pp) · Q2 Free CRM share 68% · n=2,485"/><circle cx="300.3" cy="417.0" r="5" fill="var(--q2)" class="dot" data-tip="Device · Mobile: Q1 29.5% → Q2 11.8% (-17.7pp) · Q2 Free CRM share 68% · n=2,485"/><text class="lab" x="140" y="443.0" text-anchor="end">Desktop</text><line class="bar-conn" x1="314.0" x2="520.3" y1="439.0" y2="439.0"/><circle cx="520.3" cy="439.0" r="5" fill="var(--q1)" class="dot" data-tip="Device · Desktop: Q1 29.0% → Q2 12.9% (-16.2pp) · Q2 Free CRM share 69% · n=4,562"/><circle cx="314.0" cy="439.0" r="5" fill="var(--q2)" class="dot" data-tip="Device · Desktop: Q1 29.0% → Q2 12.9% (-16.2pp) · Q2 Free CRM share 69% · n=4,562"/><text class="lab" x="140" y="465.0" text-anchor="end">Tablet</text><line class="bar-conn" x1="264.3" x2="487.2" y1="461.0" y2="461.0"/><circle cx="487.2" cy="461.0" r="5" fill="var(--q1)" class="dot" data-tip="Device · Tablet: Q1 26.4% → Q2 9.0% (-17.5pp) · Q2 Free CRM share 71% · n=266"/><circle cx="264.3" cy="461.0" r="5" fill="var(--q2)" class="dot" data-tip="Device · Tablet: Q1 26.4% → Q2 9.0% (-17.5pp) · Q2 Free CRM share 71% · n=266"/><text class="hdr" x="8" y="485">Visitor</text><text class="lab" x="140" y="509.0" text-anchor="end">New</text><line class="bar-conn" x1="311.8" x2="521.0" y1="505.0" y2="505.0"/><circle cx="521.0" cy="505.0" r="5" fill="var(--q1)" class="dot" data-tip="Visitor · New: Q1 29.1% → Q2 12.7% (-16.4pp) · Q2 Free CRM share 69% · n=4,631"/><circle cx="311.8" cy="505.0" r="5" fill="var(--q2)" class="dot" data-tip="Visitor · New: Q1 29.1% → Q2 12.7% (-16.4pp) · Q2 Free CRM share 69% · n=4,631"/><text class="lab" x="140" y="531.0" text-anchor="end">Returning</text><line class="bar-conn" x1="299.8" x2="518.7" y1="527.0" y2="527.0"/><circle cx="518.7" cy="527.0" r="5" fill="var(--q1)" class="dot" data-tip="Visitor · Returning: Q1 28.9% → Q2 11.7% (-17.2pp) · Q2 Free CRM share 69% · n=2,707"/><circle cx="299.8" cy="527.0" r="5" fill="var(--q2)" class="dot" data-tip="Visitor · Returning: Q1 28.9% → Q2 11.7% (-17.2pp) · Q2 Free CRM share 69% · n=2,707"/><text class="hdr" x="8" y="551">Company size</text><text class="lab" x="140" y="575.0" text-anchor="end">1-10</text><line class="bar-conn" x1="327.1" x2="564.2" y1="571.0" y2="571.0"/><circle cx="564.2" cy="571.0" r="5" fill="var(--q1)" class="dot" data-tip="Company size · 1-10: Q1 32.5% → Q2 13.9% (-18.6pp) · Q2 Free CRM share 68% · n=3,682"/><circle cx="327.1" cy="571.0" r="5" fill="var(--q2)" class="dot" data-tip="Company size · 1-10: Q1 32.5% → Q2 13.9% (-18.6pp) · Q2 Free CRM share 68% · n=3,682"/><text class="lab" x="140" y="597.0" text-anchor="end">11-50</text><line class="bar-conn" x1="299.7" x2="509.7" y1="593.0" y2="593.0"/><circle cx="509.7" cy="593.0" r="5" fill="var(--q1)" class="dot" data-tip="Company size · 11-50: Q1 28.2% → Q2 11.7% (-16.5pp) · Q2 Free CRM share 68% · n=2,006"/><circle cx="299.7" cy="593.0" r="5" fill="var(--q2)" class="dot" data-tip="Company size · 11-50: Q1 28.2% → Q2 11.7% (-16.5pp) · Q2 Free CRM share 68% · n=2,006"/><text class="lab" x="140" y="619.0" text-anchor="end">51-200</text><line class="bar-conn" x1="281.0" x2="435.3" y1="615.0" y2="615.0"/><circle cx="435.3" cy="615.0" r="5" fill="var(--q1)" class="dot" data-tip="Company size · 51-200: Q1 22.4% → Q2 10.3% (-12.1pp) · Q2 Free CRM share 69% · n=1,127"/><circle cx="281.0" cy="615.0" r="5" fill="var(--q2)" class="dot" data-tip="Company size · 51-200: Q1 22.4% → Q2 10.3% (-12.1pp) · Q2 Free CRM share 69% · n=1,127"/><text class="lab" x="140" y="641.0" text-anchor="end">201+</text><line class="bar-conn" x1="242.7" x2="435.4" y1="637.0" y2="637.0"/><circle cx="435.4" cy="637.0" r="5" fill="var(--q1)" class="dot" data-tip="Company size · 201+: Q1 22.4% → Q2 7.3% (-15.1pp) · Q2 Free CRM share 74% · n=485"/><circle cx="242.7" cy="637.0" r="5" fill="var(--q2)" class="dot" data-tip="Company size · 201+: Q1 22.4% → Q2 7.3% (-15.1pp) · Q2 Free CRM share 74% · n=485"/><text class="hdr" x="8" y="661">Geo</text><text class="lab" x="140" y="685.0" text-anchor="end">Australia</text><line class="bar-conn" x1="286.4" x2="570.0" y1="681.0" y2="681.0"/><circle cx="570.0" cy="681.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · Australia: Q1 32.9% → Q2 10.7% (-22.2pp) · Q2 Free CRM share 70% · n=357"/><circle cx="286.4" cy="681.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · Australia: Q1 32.9% → Q2 10.7% (-22.2pp) · Q2 Free CRM share 70% · n=357"/><text class="lab" x="140" y="707.0" text-anchor="end">US</text><line class="bar-conn" x1="317.1" x2="539.3" y1="703.0" y2="703.0"/><circle cx="539.3" cy="703.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · US: Q1 30.5% → Q2 13.1% (-17.4pp) · Q2 Free CRM share 68% · n=3,344"/><circle cx="317.1" cy="703.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · US: Q1 30.5% → Q2 13.1% (-17.4pp) · Q2 Free CRM share 68% · n=3,344"/><text class="lab" x="140" y="729.0" text-anchor="end">Canada</text><line class="bar-conn" x1="324.5" x2="517.3" y1="725.0" y2="725.0"/><circle cx="517.3" cy="725.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · Canada: Q1 28.8% → Q2 13.7% (-15.1pp) · Q2 Free CRM share 72% · n=469"/><circle cx="324.5" cy="725.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · Canada: Q1 28.8% → Q2 13.7% (-15.1pp) · Q2 Free CRM share 72% · n=469"/><text class="lab" x="140" y="751.0" text-anchor="end">Other</text><line class="bar-conn" x1="275.9" x2="514.8" y1="747.0" y2="747.0"/><circle cx="514.8" cy="747.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · Other: Q1 28.6% → Q2 9.9% (-18.7pp) · Q2 Free CRM share 70% · n=737"/><circle cx="275.9" cy="747.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · Other: Q1 28.6% → Q2 9.9% (-18.7pp) · Q2 Free CRM share 70% · n=737"/><text class="lab" x="140" y="773.0" text-anchor="end">India</text><line class="bar-conn" x1="306.9" x2="509.8" y1="769.0" y2="769.0"/><circle cx="509.8" cy="769.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · India: Q1 28.2% → Q2 12.3% (-15.9pp) · Q2 Free CRM share 69% · n=1,331"/><circle cx="306.9" cy="769.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · India: Q1 28.2% → Q2 12.3% (-15.9pp) · Q2 Free CRM share 69% · n=1,331"/><text class="lab" x="140" y="795.0" text-anchor="end">Germany</text><line class="bar-conn" x1="281.5" x2="460.4" y1="791.0" y2="791.0"/><circle cx="460.4" cy="791.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · Germany: Q1 24.3% → Q2 10.3% (-14.0pp) · Q2 Free CRM share 71% · n=375"/><circle cx="281.5" cy="791.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · Germany: Q1 24.3% → Q2 10.3% (-14.0pp) · Q2 Free CRM share 71% · n=375"/><text class="lab" x="140" y="817.0" text-anchor="end">UK</text><line class="bar-conn" x1="300.8" x2="458.9" y1="813.0" y2="813.0"/><circle cx="458.9" cy="813.0" r="5" fill="var(--q1)" class="dot" data-tip="Geo · UK: Q1 24.2% → Q2 11.8% (-12.4pp) · Q2 Free CRM share 69% · n=677"/><circle cx="300.8" cy="813.0" r="5" fill="var(--q2)" class="dot" data-tip="Geo · UK: Q1 24.2% → Q2 11.8% (-12.4pp) · Q2 Free CRM share 69% · n=677"/></svg>
+  <div class="legend"><span><i style="background:var(--q1)"></i>Q1 (Jan–Mar)</span><span><i style="background:var(--q2)"></i>Q2 (Apr–Jun)</span></div>
+</figure>
+<p>The gaps between slices that existed in Q1 are still there in Q2: small companies convert better than large ones, Email and Social above average, tablet below. Those are structural differences between sources, and they didn't change with the launch. Monthly detail for every slice is in <a href="#appendix-a">Appendix A</a>.</p>
+
+<h3>6. Free CRM: substitution vs new demand, and what it would take to break even</h3>
+<p>Trial signups (Starter + Pro) went from 1,087 to 427 per month (-61%). Free CRM brought 932. Total signups grew only 271/month, so at least ~71% of Free CRM volume came from people who would have trialed.</p>
+<p>The trials lost ~192 paying customers and ~$8.3K in new MRR per month. Free CRM upgrades all go to Starter at $35:</p>
+<figure>
+  <figcaption><div class="t" id="c6t">Free CRM lifetime conversion needed to break even</div><div class="s">Based on 932 Free CRM signups/month and Q2 monthly averages.</div></figcaption>
+  <svg viewBox="0 0 680 160" role="img" aria-labelledby="c6t"><text class="lab" x="220" y="30.0" text-anchor="end">Free CRM today (30-day)</text><path d="M230,16.0 H287.4 Q291.4,16.0 291.4,20.0 V32.0 Q291.4,36.0 287.4,36.0 H230 Z" fill="var(--s3)" data-tip="Free CRM today (30-day): 4.7%"/><text class="val" x="299.4" y="30.0">4.7%</text><text class="lab" x="220" y="66.0" text-anchor="end">Needed to replace lost wins</text><path d="M230,52.0 H493.9 Q497.9,52.0 497.9,56.0 V68.0 Q497.9,72.0 493.9,72.0 H230 Z" fill="var(--ink-total)" data-tip="Needed to replace lost wins: 20.6%"/><text class="val" x="505.9" y="66.0">20.6%</text><text class="lab" x="220" y="102.0" text-anchor="end">Needed to replace lost MRR</text><path d="M230,88.0 H558.7 Q562.7,88.0 562.7,92.0 V104.0 Q562.7,108.0 558.7,108.0 H230 Z" fill="var(--ink-total)" data-tip="Needed to replace lost MRR: 25.6%"/><text class="val" x="570.7" y="102.0">25.6%</text><text class="lab" x="220" y="138.0" text-anchor="end">Starter / Pro trials (Q2)</text><path d="M230,124.0 H602.4 Q606.4,124.0 606.4,128.0 V140.0 Q606.4,144.0 602.4,144.0 H230 Z" fill="var(--s1)" data-tip="Starter / Pro trials (Q2): 29.0%"/><text class="val" x="614.4" y="138.0">29.0%</text><line class="axis" x1="230" x2="230" y1="8" y2="152"/></svg>
+</figure>
+<p>Free CRM users who don't upgrade in the first 30 days don't show up as paying later in this data. They also don't look different from trial users before signing up: same number of prior site visits (~0.6), same channel, page, device, size and country mix. Visiting the site again after signup doesn't predict upgrading either (4.2% vs 4.8%).</p>
+
+<h3>7. Finance view (by close date)</h3>
+<p>Finance counts customers by the month the deal closed. That view tells the same story, with one caveat: January is undercounted (some January closes come from December signups, which aren't in the data). Feb–Mar is the cleaner baseline.</p>
+<div class="tbl"><table class=""><thead><tr><th>Close month</th><th>Paying customers</th><th>All closed opps (incl. $0)</th><th>New MRR</th></tr></thead><tbody><tr><td>Jan</td><td>168</td><td>173</td><td>$8,955</td></tr><tr><td>Feb</td><td>313</td><td>318</td><td>$16,580</td></tr><tr><td>Mar</td><td>316</td><td>322</td><td>$15,485</td></tr><tr><td>Apr</td><td>228</td><td>235</td><td>$11,880</td></tr><tr><td>May</td><td>177</td><td>181</td><td>$10,095</td></tr><tr><td>Jun</td><td>161</td><td>164</td><td>$9,385</td></tr><tr><td>Jul</td><td>102</td><td>102</td><td>$5,670</td></tr></tbody></table></div>
+<p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
+
+<h2 id="appendix-a">Appendix A — Signup → paid conversion by slice, monthly</h2>
+<p>All signups, 30-day wins, in %. Slices with fewer than ~70 signups/month (Australia, Germany, Canada, tablet, trial and campaign landing pages) are noisy month to month; use Q1 vs Q2 for those.</p>
+<h4>Channel</h4><div class="tbl"><table class="num"><thead><tr><th>Channel</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Q1</th><th>Q2</th><th>Δ pp</th><th>Free share Q2</th><th>Signups/mo</th></tr></thead><tbody><tr><td>Social</td><td>27.3</td><td>40.0</td><td>32.3</td><td>11.4</td><td>15.4</td><td>21.4</td><td>33.3</td><td>15.9</td><td>-17.4</td><td>71%</td><td>40</td></tr><tr><td>Direct</td><td>32.0</td><td>31.6</td><td>27.7</td><td>8.2</td><td>11.4</td><td>12.0</td><td>30.5</td><td>10.6</td><td>-19.9</td><td>69%</td><td>283</td></tr><tr><td>Organic Search</td><td>32.2</td><td>29.8</td><td>27.9</td><td>10.1</td><td>11.5</td><td>14.1</td><td>29.9</td><td>11.9</td><td>-18.0</td><td>68%</td><td>312</td></tr><tr><td>Email</td><td>26.4</td><td>28.6</td><td>35.1</td><td>21.4</td><td>13.9</td><td>13.2</td><td>29.8</td><td>16.1</td><td>-13.7</td><td>67%</td><td>134</td></tr><tr><td>Paid Search</td><td>25.5</td><td>31.1</td><td>25.6</td><td>11.8</td><td>14.1</td><td>13.0</td><td>27.2</td><td>13.0</td><td>-14.3</td><td>68%</td><td>300</td></tr><tr><td>Referral</td><td>27.4</td><td>28.4</td><td>23.5</td><td>11.8</td><td>12.8</td><td>10.1</td><td>26.3</td><td>11.5</td><td>-14.8</td><td>70%</td><td>99</td></tr><tr><td>Display</td><td>15.4</td><td>28.0</td><td>26.0</td><td>7.5</td><td>14.1</td><td>10.6</td><td>25.0</td><td>10.4</td><td>-14.6</td><td>71%</td><td>56</td></tr><tr><td><b>All signups</b></td><td><b>28.9</b></td><td><b>30.6</b></td><td><b>27.7</b></td><td><b>11.3</b></td><td><b>12.8</b></td><td><b>13.0</b></td><td><b>29.0</b></td><td><b>12.3</b></td><td><b>-16.7</b></td><td></td><td><b>1,223</b></td></tr></tbody></table></div><h4>Entry page</h4><div class="tbl"><table class="num"><thead><tr><th>Entry page</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Q1</th><th>Q2</th><th>Δ pp</th><th>Free share Q2</th><th>Signups/mo</th></tr></thead><tbody><tr><td>Campaign landing page</td><td>30.2</td><td>26.2</td><td>42.2</td><td>10.3</td><td>10.1</td><td>10.3</td><td>32.1</td><td>10.2</td><td>-21.9</td><td>74%</td><td>64</td></tr><tr><td>Free CRM landing page</td><td>25.0</td><td>38.3</td><td>28.7</td><td>15.7</td><td>12.6</td><td>14.5</td><td>30.5</td><td>14.2</td><td>-16.3</td><td>65%</td><td>100</td></tr><tr><td>Pricing</td><td>28.4</td><td>33.3</td><td>29.7</td><td>14.5</td><td>12.1</td><td>9.4</td><td>30.3</td><td>11.9</td><td>-18.4</td><td>68%</td><td>250</td></tr><tr><td>Content (blog, guides)</td><td>34.0</td><td>29.3</td><td>25.7</td><td>7.6</td><td>12.7</td><td>16.3</td><td>29.4</td><td>12.1</td><td>-17.2</td><td>69%</td><td>258</td></tr><tr><td>Home</td><td>28.2</td><td>29.4</td><td>27.2</td><td>10.4</td><td>12.4</td><td>11.6</td><td>28.3</td><td>11.5</td><td>-16.8</td><td>70%</td><td>260</td></tr><tr><td>Starter trial landing page</td><td>28.0</td><td>20.7</td><td>37.5</td><td>4.4</td><td>14.0</td><td>16.7</td><td>28.2</td><td>11.2</td><td>-17.0</td><td>67%</td><td>34</td></tr><tr><td>Product / features</td><td>28.0</td><td>30.1</td><td>24.4</td><td>13.0</td><td>14.9</td><td>14.1</td><td>27.5</td><td>13.9</td><td>-13.6</td><td>68%</td><td>254</td></tr><tr><td><b>All signups</b></td><td><b>28.9</b></td><td><b>30.6</b></td><td><b>27.7</b></td><td><b>11.3</b></td><td><b>12.8</b></td><td><b>13.0</b></td><td><b>29.0</b></td><td><b>12.3</b></td><td><b>-16.7</b></td><td></td><td><b>1,223</b></td></tr></tbody></table></div><h4>Device</h4><div class="tbl"><table class="num"><thead><tr><th>Device</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Q1</th><th>Q2</th><th>Δ pp</th><th>Free share Q2</th><th>Signups/mo</th></tr></thead><tbody><tr><td>Mobile</td><td>28.9</td><td>32.0</td><td>27.8</td><td>11.6</td><td>13.5</td><td>10.4</td><td>29.5</td><td>11.8</td><td>-17.7</td><td>68%</td><td>414</td></tr><tr><td>Desktop</td><td>29.4</td><td>30.2</td><td>27.5</td><td>11.1</td><td>12.8</td><td>14.7</td><td>29.0</td><td>12.9</td><td>-16.2</td><td>69%</td><td>760</td></tr><tr><td>Tablet</td><td>24.4</td><td>23.7</td><td>31.0</td><td>13.0</td><td>5.4</td><td>7.4</td><td>26.4</td><td>9.0</td><td>-17.5</td><td>71%</td><td>44</td></tr><tr><td><b>All signups</b></td><td><b>28.9</b></td><td><b>30.6</b></td><td><b>27.7</b></td><td><b>11.3</b></td><td><b>12.8</b></td><td><b>13.0</b></td><td><b>29.0</b></td><td><b>12.3</b></td><td><b>-16.7</b></td><td></td><td><b>1,223</b></td></tr></tbody></table></div><h4>Visitor</h4><div class="tbl"><table class="num"><thead><tr><th>Visitor</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Q1</th><th>Q2</th><th>Δ pp</th><th>Free share Q2</th><th>Signups/mo</th></tr></thead><tbody><tr><td>New</td><td>28.1</td><td>31.2</td><td>28.1</td><td>11.0</td><td>13.1</td><td>13.9</td><td>29.1</td><td>12.7</td><td>-16.4</td><td>69%</td><td>772</td></tr><tr><td>Returning</td><td>30.7</td><td>29.4</td><td>27.0</td><td>11.8</td><td>12.2</td><td>11.3</td><td>28.9</td><td>11.7</td><td>-17.2</td><td>69%</td><td>451</td></tr><tr><td><b>All signups</b></td><td><b>28.9</b></td><td><b>30.6</b></td><td><b>27.7</b></td><td><b>11.3</b></td><td><b>12.8</b></td><td><b>13.0</b></td><td><b>29.0</b></td><td><b>12.3</b></td><td><b>-16.7</b></td><td></td><td><b>1,223</b></td></tr></tbody></table></div><h4>Company size</h4><div class="tbl"><table class="num"><thead><tr><th>Company size</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Q1</th><th>Q2</th><th>Δ pp</th><th>Free share Q2</th><th>Signups/mo</th></tr></thead><tbody><tr><td>1-10</td><td>34.4</td><td>32.8</td><td>30.3</td><td>13.5</td><td>13.6</td><td>14.5</td><td>32.5</td><td>13.9</td><td>-18.6</td><td>68%</td><td>614</td></tr><tr><td>11-50</td><td>25.6</td><td>31.7</td><td>27.9</td><td>10.2</td><td>13.7</td><td>11.3</td><td>28.2</td><td>11.7</td><td>-16.5</td><td>68%</td><td>334</td></tr><tr><td>51-200</td><td>19.6</td><td>25.7</td><td>22.2</td><td>6.8</td><td>13.0</td><td>11.0</td><td>22.4</td><td>10.3</td><td>-12.1</td><td>69%</td><td>188</td></tr><tr><td>201+</td><td>26.2</td><td>21.7</td><td>20.0</td><td>9.3</td><td>4.1</td><td>8.8</td><td>22.4</td><td>7.3</td><td>-15.1</td><td>74%</td><td>81</td></tr><tr><td><b>All signups</b></td><td><b>28.9</b></td><td><b>30.6</b></td><td><b>27.7</b></td><td><b>11.3</b></td><td><b>12.8</b></td><td><b>13.0</b></td><td><b>29.0</b></td><td><b>12.3</b></td><td><b>-16.7</b></td><td></td><td><b>1,223</b></td></tr></tbody></table></div><h4>Geo</h4><div class="tbl"><table class="num"><thead><tr><th>Geo</th><th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Q1</th><th>Q2</th><th>Δ pp</th><th>Free share Q2</th><th>Signups/mo</th></tr></thead><tbody><tr><td>Australia</td><td>41.2</td><td>31.4</td><td>23.5</td><td>9.4</td><td>12.3</td><td>9.8</td><td>32.9</td><td>10.7</td><td>-22.2</td><td>70%</td><td>60</td></tr><tr><td>US</td><td>27.4</td><td>34.7</td><td>29.5</td><td>11.1</td><td>14.4</td><td>13.8</td><td>30.5</td><td>13.1</td><td>-17.4</td><td>68%</td><td>557</td></tr><tr><td>Canada</td><td>25.4</td><td>34.0</td><td>28.8</td><td>18.7</td><td>11.6</td><td>11.1</td><td>28.8</td><td>13.7</td><td>-15.1</td><td>72%</td><td>78</td></tr><tr><td>Other</td><td>30.9</td><td>26.8</td><td>27.8</td><td>12.9</td><td>7.3</td><td>9.1</td><td>28.6</td><td>9.9</td><td>-18.7</td><td>70%</td><td>123</td></tr><tr><td>India</td><td>31.3</td><td>25.0</td><td>28.6</td><td>12.0</td><td>11.8</td><td>13.0</td><td>28.2</td><td>12.3</td><td>-15.9</td><td>69%</td><td>222</td></tr><tr><td>Germany</td><td>30.0</td><td>21.7</td><td>21.4</td><td>5.1</td><td>12.7</td><td>13.6</td><td>24.3</td><td>10.3</td><td>-14.0</td><td>71%</td><td>62</td></tr><tr><td>UK</td><td>24.6</td><td>25.6</td><td>22.9</td><td>7.9</td><td>12.4</td><td>16.2</td><td>24.2</td><td>11.8</td><td>-12.4</td><td>69%</td><td>113</td></tr><tr><td><b>All signups</b></td><td><b>28.9</b></td><td><b>30.6</b></td><td><b>27.7</b></td><td><b>11.3</b></td><td><b>12.8</b></td><td><b>13.0</b></td><td><b>29.0</b></td><td><b>12.3</b></td><td><b>-16.7</b></td><td></td><td><b>1,223</b></td></tr></tbody></table></div>
+
+<h2 id="appendix-b">Appendix B — Queries</h2>
+<p>Everything in this document is produced by three SQL files (DuckDB, standard SQL). Run them in order from the repo root.</p>
+<ul>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a> — cleaning rules R1–R14 and the analysis base table <code>signup_outcomes</code></li>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a> — monthly funnel, plan split, slice conversion, finance view</li>
+  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a> — Kitagawa decomposition</li>
+</ul>
+<details><summary>Win definition (from 01_clean.sql)</summary><pre>-- ANALYSIS BASE: 1 row per signup with origin attributes + 30-day win
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE TABLE signup_outcomes AS
+WITH first_visit AS (
+    SELECT visitor_id, MIN(event_dt) AS first_visit_dt
+    FROM sessions_clean
+    WHERE visitor_id IS NOT NULL
+    GROUP BY visitor_id
+)
+SELECT
+    g.*,
+    date_trunc(&#x27;month&#x27;, g.created_dt)::DATE                             AS signup_month,
+    CASE WHEN g.created_dt &lt; DATE &#x27;2026-04-01&#x27; THEN &#x27;Q1&#x27; ELSE &#x27;Q2&#x27; END  AS period,
+    s.device_type,
+    s.page_type,
+    CASE WHEN fv.first_visit_dt &lt; g.created_dt THEN &#x27;Returning&#x27; ELSE &#x27;New&#x27; END AS visitor_type,
+    CASE WHEN g.company_size IS NULL THEN &#x27;Unknown&#x27;
+         WHEN g.company_size &lt;= 10  THEN &#x27;1-10&#x27;
+         WHEN g.company_size &lt;= 50  THEN &#x27;11-50&#x27;
+         WHEN g.company_size &lt;= 200 THEN &#x27;51-200&#x27;
+         ELSE &#x27;201+&#x27; END                                                AS company_size_bucket,
+    o.plan                                                              AS won_plan,
+    o.amount                                                            AS won_amount,
+    o.days_to_close,
+    -- Win definition: paying (amount &gt; 0) opp closed within 30 days of signup
+    (o.opp_id IS NOT NULL AND o.days_to_close &lt;= 30)                    AS win_30d
+FROM signups_clean g
+LEFT JOIN sessions_clean s       USING (session_id)
+LEFT JOIN first_visit fv         ON fv.visitor_id = g.visitor_id
+LEFT JOIN opportunities_clean o  ON o.lead_id = g.lead_id AND NOT o.zero_amount;
+</pre></details>
+<details><summary>Decomposition (03_decomposition.sql)</summary><pre>-- =====================================================================
+-- 03_decomposition.sql — Kitagawa decomposition of the change in
+-- paying customers (30-day wins) per month, Q1 vs Q2 2026.
+--
+--   Wins = N x R            N = signups / month,  R = blended conversion
+--   R    = SUM_i m_i x r_i  m_i = product mix share, r_i = product conversion
+--
+-- Exact symmetric (Kitagawa) split, using period averages (bar):
+--   dWins  = dN x R_bar                        -&gt; VOLUME effect
+--          + N_bar x SUM_i dm_i x r_bar_i      -&gt; MIX effect   (by product)
+--          + N_bar x SUM_i m_bar_i x dr_i      -&gt; RATE effect  (by product)
+--
+-- Assumption: Free CRM did not exist in Q1, so it has no Q1 rate.
+-- We set r_Q1(Free) = r_Q2(Free): Free contributes no rate effect and its
+-- whole impact is counted as mix. Requires 01_clean.sql.
+-- =====================================================================
+
+CREATE OR REPLACE TABLE kitagawa AS
+WITH by_product AS (
+    SELECT period, product,
+           COUNT(*) / 3.0                AS signups_mo,
+           SUM(win_30d::INT) / 3.0       AS wins_mo
+    FROM signup_outcomes
+    GROUP BY ALL
+),
+grid AS (   -- every product in both periods (Free CRM has zero Q1 signups)
+    SELECT p.period, pr.product
+    FROM (VALUES (&#x27;Q1&#x27;), (&#x27;Q2&#x27;)) p(period)
+    CROSS JOIN (SELECT DISTINCT product FROM signup_outcomes) pr
+),
+filled AS (
+    SELECT g.period, g.product,
+           COALESCE(b.signups_mo, 0) AS signups_mo,
+           COALESCE(b.wins_mo, 0)    AS wins_mo
+    FROM grid g LEFT JOIN by_product b USING (period, product)
+),
+shares AS (
+    SELECT *,
+           signups_mo / SUM(signups_mo) OVER (PARTITION BY period) AS mix,
+           wins_mo / NULLIF(signups_mo, 0)                         AS rate
+    FROM filled
+),
+wide AS (
+    SELECT q1.product,
+           q1.mix AS mix_q1, q2.mix AS mix_q2,
+           COALESCE(q1.rate, q2.rate) AS rate_q1,   -- Free CRM assumption
+           q2.rate AS rate_q2
+    FROM shares q1 JOIN shares q2 USING (product)
+    WHERE q1.period = &#x27;Q1&#x27; AND q2.period = &#x27;Q2&#x27;
+),
+totals AS (
+    SELECT period, SUM(signups_mo) AS n, SUM(wins_mo) AS w, SUM(wins_mo) / SUM(signups_mo) AS r
+    FROM filled GROUP BY period
+),
+t AS (
+    SELECT q1.n AS n1, q2.n AS n2, q1.w AS w1, q2.w AS w2, q1.r AS r1, q2.r AS r2
+    FROM totals q1, totals q2 WHERE q1.period = &#x27;Q1&#x27; AND q2.period = &#x27;Q2&#x27;
+)
+SELECT &#x27;Q1 wins / month&#x27; AS step, NULL AS product, w1 AS wins FROM t
+UNION ALL
+SELECT &#x27;Volume effect&#x27;, NULL, (n2 - n1) * (r1 + r2) / 2 FROM t
+UNION ALL
+SELECT &#x27;Mix effect&#x27;, w.product,
+       (t.n1 + t.n2) / 2 * (w.mix_q2 - w.mix_q1) * (w.rate_q1 + w.rate_q2) / 2
+FROM wide w, t
+UNION ALL
+SELECT &#x27;Rate effect&#x27;, w.product,
+       (t.n1 + t.n2) / 2 * (w.mix_q1 + w.mix_q2) / 2 * (w.rate_q2 - w.rate_q1)
+FROM wide w, t
+UNION ALL
+SELECT &#x27;Q2 wins / month&#x27;, NULL, w2 FROM t;
+
+-- Waterfall view (one bar per effect)
+SELECT step, ROUND(SUM(wins), 1) AS wins_per_month
+FROM kitagawa
+GROUP BY step
+ORDER BY CASE step WHEN &#x27;Q1 wins / month&#x27; THEN 1 WHEN &#x27;Volume effect&#x27; THEN 2
+                   WHEN &#x27;Mix effect&#x27; THEN 3 WHEN &#x27;Rate effect&#x27; THEN 4 ELSE 5 END;</pre></details>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>
+const tip=document.getElementById('tip');
+document.querySelectorAll('[data-tip]').forEach(el=>{
+  el.addEventListener('mousemove',e=>{tip.textContent=el.dataset.tip;tip.style.opacity=1;
+    const x=Math.min(e.clientX+12, innerWidth-tip.offsetWidth-8);tip.style.left=x+'px';tip.style.top=(e.clientY+14)+'px';});
+  el.addEventListener('mouseleave',()=>tip.style.opacity=0);
+});
+</script>
+</body>
+</html>
