@@ -467,6 +467,7 @@ sup a {{ text-decoration:none; }}
 
 <h2>Data</h2>
 <p>We used {f0(n_sessions)} website sessions, {f0(n_signups)} signups and {f0(n_opps)} closed opportunities. Sessions and signups cover Jan 1 – Jun 30, 2026; opportunities run to {opp_end:%b %-d} so June signups have time to close. Signups are grouped by the month they signed up (cohorts) and compared as Q1 (Jan–Mar, before Free CRM) vs Q2 (Apr–Jun, after launch) using monthly averages. A paying customer is an opportunity with amount &gt; $0 closed within 30 days of signup. How the data was validated, cleaned and joined is in <a href="data-methodology.html">Data methodology</a>.</p>
+<p class="note-foot">Note: Direct traffic jumps to 37% of sessions in June while its session-to-signup rate halves (3.0% → 1.3%), likely a tracking or bot issue. It doesn't affect the signup-to-paid findings.</p>
 
 <h2>Problem</h2>
 <p>Northwind CRM shows an apparent signup-to-paid conversion problem: blended conversion fell from {cr1:.0f}% to {cr2:.0f}% and paying customers dropped ~{100*(1-w2/w1):.0f}% ({f0(w1)} → {f0(w2)}/month), even as signups grew {100*(n2/n1-1):.0f}%. The timing aligns with the launch of a new packaging scheme that includes a freemium plan.</p>
@@ -486,13 +487,6 @@ sup a {{ text-decoration:none; }}
 </ol>
 <p class="note-foot" id="star">* {f0(net_new)} net new signups/month is an upper bound for what Free CRM added. In the same period traffic grew {traffic_growth:.0f}% (mostly Display and, in June, Direct) and the signup increase is spread across all channels. With this data we can't separate how much of the growth came from Free CRM vs traffic.</p>
 <p class="note-foot" id="pro">† Pro's Q1 average is lifted by January (38.6%). Feb–Jun Pro ranges 26–32%, in line with Q2.</p>
-
-<h3>Limitations</h3>
-<ul>
-  <li><b>30-day visibility.</b> No opportunity in the extract closes more than 29 days after signup, for any plan, even for April cohorts with ~85 days of history. Either Free CRM users decide in month one or the extract only captures the first 30 days. A freemium plan usually converts over a longer period, so Free CRM's true lifetime conversion could be higher than 4.7%. Even so, it would need to be 4–5× higher to break even.</li>
-  <li><b>No product usage data.</b> Sessions are website visits, not product logins. We can't see activation or engagement inside Free CRM, so we can't tell why 95% of free users don't upgrade.</li>
-  <li><b>Direct traffic in June.</b> Direct jumps to 37% of sessions in June and its session-to-signup rate halves (3.0% → 1.3%). Likely a tracking or bot issue; it doesn't change the findings but should be checked.</li>
-</ul>
 
 <h2>Recommendations</h2>
 <div class="pending">Draft — recommendations to be added.</div>

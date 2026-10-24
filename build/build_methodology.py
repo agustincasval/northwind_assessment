@@ -236,7 +236,7 @@ page = f"""<!doctype html>
 <h2>6. What the data can't tell us</h2>
 <ul>
   <li><b>Anything inside the product.</b> Sessions are website visits; there are no product logins or usage events. We can't measure activation.</li>
-  <li><b>Upgrades after 30 days.</b> Either they don't happen or the extract doesn't include them. For a freemium plan that's a real gap.</li>
+  <li><b>Upgrades after 30 days.</b> No deal closes more than {dtc_max} days after signup, for any SKU, even for April cohorts with ~85 days of history. Either Free CRM users decide in their first month or the extract only captures the first 30 days. A freemium plan usually converts over a longer period, so Free CRM's lifetime conversion could be higher than what we observe.</li>
   <li><b>Multi-touch attribution.</b> Only the signup session is linked to the lead.</li>
   <li><b>Direct traffic in June.</b> Direct jumps to 37% of sessions and its signup rate halves. Probably tracking or bots; worth checking at the source.</li>
 </ul>
