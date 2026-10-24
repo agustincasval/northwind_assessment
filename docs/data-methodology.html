@@ -10,7 +10,7 @@
   --bg:#f9f9f7; --surface:#fcfcfb; --fg:#0b0b0b; --fg2:#52514e; --muted:#898781;
   --line:#e1e0d9; --axis:#c3c2b7; --accent:#1c5cab; --callout:#eef4fc;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --ink-total:#6b6a66;
-  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6;
+  --pos:#2a78d6; --neg:#e34948; --q1:#a9a8a2; --q2:#2a78d6; --bar-neutral:#b9b8b1; --track:#e4e3dd;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -18,7 +18,7 @@
     --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
     --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5;
+    --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955; --track:#2e2e2c;
   }
 }
 :root[data-theme="dark"] {
@@ -26,7 +26,7 @@
   --bg:#0d0d0d; --surface:#1a1a19; --fg:#f0efec; --fg2:#c3c2b7; --muted:#898781;
   --line:#2c2c2a; --axis:#383835; --accent:#86b6ef; --callout:#16202c;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --ink-total:#8a8984;
-  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5;
+  --pos:#3987e5; --neg:#e66767; --q1:#6b6a66; --q2:#3987e5; --bar-neutral:#5a5955; --track:#2e2e2c;
 }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -68,6 +68,9 @@ svg .lab { fill:var(--fg2); font-size:12px; }
 svg .hdr { fill:var(--fg); font-size:12px; font-weight:600; }
 svg .note { fill:var(--muted); font-size:11px; }
 svg .marker { stroke:var(--axis); stroke-width:1; }
+svg .halo { paint-order:stroke; stroke:var(--surface); stroke-width:4px; stroke-linejoin:round; font-weight:600; }
+svg .axt { fill:var(--fg2); font-size:11px; font-weight:600; }
+svg .launch { stroke:var(--fg2); stroke-width:1.5; stroke-dasharray:4 4; }
 svg .conn { stroke:var(--muted); stroke-width:1; }
 svg .bar-conn { stroke:var(--axis); stroke-width:2; }
 svg .ln { stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
@@ -87,6 +90,7 @@ table.kit td:nth-child(3), table.kit th:nth-child(3) { text-align:left; color:va
 details { margin:12px 0; }
 summary { cursor:pointer; font-weight:600; }
 pre { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px; overflow-x:auto; font-size:12.5px; line-height:1.5; }
+.gloss li { margin-bottom:6px; }
 .pending { border:1px dashed var(--axis); border-radius:10px; padding:16px 18px; color:var(--fg2); }
 sup a { text-decoration:none; }
 
@@ -171,6 +175,7 @@ code { font-family:ui-monospace,Menlo,monospace; font-size:0.9em; }
 <ul>
   <li><b>Anything inside the product.</b> Sessions are website visits; there are no product logins or usage events. We can't measure activation.</li>
   <li><b>Upgrades after 30 days.</b> No deal closes more than 29 days after signup, for any SKU, even for April cohorts with ~85 days of history. Either Free CRM users decide in their first month or the extract only captures the first 30 days. A freemium plan usually converts over a longer period, so Free CRM's lifetime conversion could be higher than what we observe.</li>
+  <li><b>Free CRM landing page before launch.</b> The Free CRM landing page URLs (<code>/lp/free-crm</code>, <code>/offers/free-crm/</code>) get traffic from January: 12,802 sessions in Q1 (10% of Q1 traffic), producing 249 Starter and Pro signups before the product existed. The same happens with <code>/campaign/spring-2026</code>. It could be a teaser page, a reused URL or an artifact of the extract. Left as is: we can't tell which version is right, and no finding depends on it.</li>
   <li><b>Multi-touch attribution.</b> Only the signup session is linked to the lead.</li>
   <li><b>Direct traffic in June.</b> Direct jumps to 37% of sessions and its signup rate halves. Probably tracking or bots; worth checking at the source.</li>
 </ul>
@@ -370,6 +375,19 @@ SELECT month, sessions, signups, wins_30d, new_mrr_30d,
        ROUND(100.0 * wins_30d / sessions, 2) AS sess_to_win_pct
 FROM sess JOIN sig USING (month)
 ORDER BY month;
+
+-- 1b. Weekly cohort funnel (Monday-start weeks). Only complete 7-day weeks are
+--     kept: the first (Jan 1-4) and last (Jun 29-30) weeks are partial.
+CREATE OR REPLACE TABLE weekly_funnel AS
+SELECT date_trunc(&#x27;week&#x27;, created_dt)::DATE         AS week_start,
+       COUNT(*)                                     AS signups,
+       SUM((product = &#x27;Free CRM&#x27;)::INT)             AS free_crm_signups,
+       SUM(win_30d::INT)                            AS wins_30d,
+       ROUND(100.0 * AVG(win_30d::INT), 1)          AS signup_to_win_pct
+FROM signup_outcomes
+GROUP BY 1
+HAVING date_diff(&#x27;day&#x27;, MIN(created_dt), MAX(created_dt)) = 6   -- full week only
+ORDER BY 1;
 
 -- 2. Same funnel split by product (mix, conversion, wins, MRR)
 CREATE OR REPLACE TABLE product_funnel AS

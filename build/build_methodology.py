@@ -51,6 +51,10 @@ imputed = con.execute("""
     JOIN opportunities_clean o USING (lead_id)
     WHERE g.created_dt_imputed ORDER BY 1""").fetchall()
 
+lp_q1 = one("""SELECT COUNT(*), SUM(converted_flag) FROM sessions_clean
+              WHERE page_type = 'free_crm_lp' AND event_dt < DATE '2026-04-01'""")
+lp_q1_share = one("""SELECT 100.0 * COUNT(*) FILTER (WHERE page_type = 'free_crm_lp') / COUNT(*)
+                    FROM sessions_clean WHERE event_dt < DATE '2026-04-01'""")[0]
 # ------------------------------------------------------------------ rule counts
 rc = {
     "R1": one(f"SELECT COUNT(*) FROM {RAW('sessions')} WHERE mktg_channel NOT IN ('Direct','Display','Email','Organic Search','Paid Search','Referral','Social')")[0],
@@ -237,6 +241,7 @@ page = f"""<!doctype html>
 <ul>
   <li><b>Anything inside the product.</b> Sessions are website visits; there are no product logins or usage events. We can't measure activation.</li>
   <li><b>Upgrades after 30 days.</b> No deal closes more than {dtc_max} days after signup, for any SKU, even for April cohorts with ~85 days of history. Either Free CRM users decide in their first month or the extract only captures the first 30 days. A freemium plan usually converts over a longer period, so Free CRM's lifetime conversion could be higher than what we observe.</li>
+  <li><b>Free CRM landing page before launch.</b> The Free CRM landing page URLs (<code>/lp/free-crm</code>, <code>/offers/free-crm/</code>) get traffic from January: {f0(lp_q1[0])} sessions in Q1 ({lp_q1_share:.0f}% of Q1 traffic), producing {f0(lp_q1[1])} Starter and Pro signups before the product existed. The same happens with <code>/campaign/spring-2026</code>. It could be a teaser page, a reused URL or an artifact of the extract. Left as is: we can't tell which version is right, and no finding depends on it.</li>
   <li><b>Multi-touch attribution.</b> Only the signup session is linked to the lead.</li>
   <li><b>Direct traffic in June.</b> Direct jumps to 37% of sessions and its signup rate halves. Probably tracking or bots; worth checking at the source.</li>
 </ul>
