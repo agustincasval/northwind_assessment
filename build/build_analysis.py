@@ -634,7 +634,6 @@ sup a {{ text-decoration:none; }}
   {legend([(p, PC[p]) for p in ["Starter", "Pro", "Free CRM"]] + [("Blended (all signups)", "--ink-total")])}
 </figure>
 {t_prod}
-<p>This is a textbook case of Simpson's paradox: the overall rate falls even though no group's rate falls, because the weight of each group changes.</p>
 
 <h3>3. How much of the drop each factor explains</h3>
 <p>We split the change in monthly paying customers into three parts (Kitagawa decomposition): <b>volume</b> (more signups), <b>mix</b> (which SKU they sign up for) and <b>rate</b> (conversion inside each SKU). The three parts add up exactly to the total change.</p>
