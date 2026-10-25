@@ -539,27 +539,40 @@ ORDER BY month, product;
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE slice_conversion AS
 WITH stacked AS (
-    SELECT signup_month, period, is_win, product, &#x27;channel&#x27;      AS dimension, mktg_channel        AS value FROM signup_outcomes
+    SELECT signup_month, period, is_win, product,
+           &#x27;channel&#x27; AS dimension, mktg_channel AS value
+    FROM signup_outcomes
     UNION ALL
-    SELECT signup_month, period, is_win, product, &#x27;entry_page&#x27;   AS dimension, page_type           AS value FROM signup_outcomes
+    SELECT signup_month, period, is_win, product,
+           &#x27;entry_page&#x27;, page_type
+    FROM signup_outcomes
     UNION ALL
-    SELECT signup_month, period, is_win, product, &#x27;device&#x27;       AS dimension, device_type         AS value FROM signup_outcomes
+    SELECT signup_month, period, is_win, product,
+           &#x27;device&#x27;, device_type
+    FROM signup_outcomes
     UNION ALL
-    SELECT signup_month, period, is_win, product, &#x27;visitor_type&#x27; AS dimension, visitor_type        AS value FROM signup_outcomes
+    SELECT signup_month, period, is_win, product,
+           &#x27;visitor_type&#x27;, visitor_type
+    FROM signup_outcomes
     UNION ALL
-    SELECT signup_month, period, is_win, product, &#x27;company_size&#x27; AS dimension, company_size_bucket AS value FROM signup_outcomes
+    SELECT signup_month, period, is_win, product,
+           &#x27;company_size&#x27;, company_size_bucket
+    FROM signup_outcomes
     UNION ALL
-    SELECT signup_month, period, is_win, product, &#x27;geo&#x27;          AS dimension, COALESCE(geo, &#x27;Unknown&#x27;) AS value FROM signup_outcomes
+    SELECT signup_month, period, is_win, product,
+           &#x27;geo&#x27;, COALESCE(geo, &#x27;Unknown&#x27;)
+    FROM signup_outcomes
 )
 SELECT
     dimension,
     value,
     signup_month AS month,
     period,
-    COUNT(*)                                                           AS signups,
-    SUM(is_win)                                                        AS wins_30d,
-    ROUND(100.0 * AVG(is_win), 1)                                      AS signup_to_win_pct,
-    ROUND(100.0 * AVG(CASE WHEN product = &#x27;Free CRM&#x27; THEN 1 ELSE 0 END), 1) AS free_crm_share_pct
+    COUNT(*)                        AS signups,
+    SUM(is_win)                     AS wins_30d,
+    ROUND(100.0 * AVG(is_win), 1)   AS signup_to_win_pct,
+    ROUND(100.0 * AVG(CASE WHEN product = &#x27;Free CRM&#x27; THEN 1 ELSE 0 END), 1)
+                                    AS free_crm_share_pct
 FROM stacked
 WHERE value IS NOT NULL            -- the 25 signups with no visit have no page/device
 GROUP BY dimension, value, signup_month, period
