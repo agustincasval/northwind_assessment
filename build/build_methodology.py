@@ -10,6 +10,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parent.parent
 os.chdir(ROOT)
 con = duckdb.connect()
+con.execute(Path("sql/00_load_raw.sql").read_text())
 con.execute(Path("sql/01_clean.sql").read_text())
 one = lambda s: con.execute(s).fetchone()
 RAW = lambda t: f"read_csv_auto('data/{t}.csv')"
@@ -36,7 +37,7 @@ j = one("""SELECT COUNT(*), COUNT(s.session_id), COUNT(*) FILTER (WHERE s.conver
            FROM signups_clean g LEFT JOIN sessions_clean s USING (session_id)""")
 g_tot, g_matched, g_flag1, g_vis_ok, g_ch_ok, g_geo_ok, g_geo_both, g_sameday = j
 flag_no_signup = one("SELECT COUNT(*) FROM sessions_clean WHERE converted_flag = 1 AND session_id NOT IN (SELECT session_id FROM signups_clean)")[0]
-o_tot, o_matched = one("SELECT COUNT(*), COUNT(*) FILTER (WHERE NOT lead_orphan) FROM opportunities_clean")
+o_tot, o_matched = one("SELECT COUNT(*), COUNT(*) FILTER (WHERE is_lead_orphan = 0) FROM opportunities_clean")
 opp_per_lead = one("SELECT MAX(c) FROM (SELECT lead_id, COUNT(*) c FROM opportunities_clean GROUP BY 1)")[0]
 close_before = one("SELECT COUNT(*) FROM opportunities_clean o JOIN signups_clean g USING (lead_id) WHERE o.close_dt < g.created_dt")[0]
 dtc_max = one("SELECT MAX(days_to_close) FROM opportunities_clean")[0]
@@ -49,7 +50,7 @@ imputed = con.execute("""
     FROM signups_clean g
     JOIN (SELECT DISTINCT lead_id, created_dt FROM read_csv_auto('data/signups.csv')) r USING (lead_id)
     JOIN opportunities_clean o USING (lead_id)
-    WHERE g.created_dt_imputed ORDER BY 1""").fetchall()
+    WHERE g.is_date_fixed = 1 ORDER BY 1""").fetchall()
 
 lp_q1 = one("""SELECT COUNT(*), SUM(converted_flag) FROM sessions_clean
               WHERE page_type = 'free_crm_lp' AND event_dt < DATE '2026-04-01'""")
@@ -63,13 +64,13 @@ rc = {
     "R4": raw_n["signups"] - one(f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {RAW('signups')})")[0],
     "R5": one(f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {RAW('signups')}) WHERE company_size < 1 OR company_size >= 999999")[0],
     "R6": one(f"SELECT COUNT(*) FROM (SELECT lead_id FROM (SELECT DISTINCT * FROM {RAW('signups')}) GROUP BY 1 HAVING COUNT(*) > 1)")[0],
-    "R7": one("SELECT COUNT(*) FROM signups_clean WHERE created_dt_imputed")[0],
-    "R8": one("SELECT COUNT(*) FROM signups_clean WHERE session_orphan")[0],
+    "R7": one("SELECT COUNT(*) FROM signups_clean WHERE is_date_fixed = 1")[0],
+    "R8": one("SELECT COUNT(*) FROM signups_clean WHERE is_session_orphan = 1")[0],
     "R9": raw_n["opportunities"] - one(f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {RAW('opportunities')})")[0],
     "R10": one(f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {RAW('opportunities')}) WHERE amount IN (35000, 110000)")[0],
-    "R11": one("SELECT COUNT(*) FROM opportunities_clean WHERE zero_amount")[0],
+    "R11": one("SELECT COUNT(*) FROM opportunities_clean WHERE is_zero_amount = 1")[0],
     "R12": one(f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {RAW('opportunities')}) WHERE days_to_close < 0")[0],
-    "R13": one("SELECT COUNT(*) FROM opportunities_clean WHERE lead_orphan")[0],
+    "R13": one("SELECT COUNT(*) FROM opportunities_clean WHERE is_lead_orphan = 1")[0],
     "R14": one(f"SELECT COUNT(*) FROM (SELECT DISTINCT * FROM {RAW('signups')}) WHERE trim(geo) = 'N/A'")[0],
 }
 pages = con.execute("SELECT page_type, COUNT(*) FROM sessions_clean GROUP BY 1 ORDER BY 2 DESC").fetchall()
@@ -247,10 +248,12 @@ page = f"""<!doctype html>
 </ul>
 
 <h2>7. Reproduce it</h2>
-<p>Requires <a href="https://duckdb.org">DuckDB</a>. From the repo root, run the three files in order. Engine-specific functions (<code>read_csv_auto</code>, <code>date_trunc</code>, <code>date_diff</code>) have direct equivalents in Snowflake or BigQuery.</p>
-<pre>duckdb northwind.duckdb &lt; sql/01_clean.sql
+<p>The queries are written in Snowflake SQL and avoid engine-specific functions, so they also run unchanged in <a href="https://duckdb.org">DuckDB</a> on a laptop. In Snowflake, run 01, 02 and 03 against the <code>sessions</code>, <code>signups</code> and <code>opportunities</code> tables. Locally, run <code>00_load_raw.sql</code> first to load the CSVs into tables with those same names. Run from the folder that contains <code>data/</code>.</p>
+<pre>duckdb northwind.duckdb &lt; sql/00_load_raw.sql
+duckdb northwind.duckdb &lt; sql/01_clean.sql
 duckdb northwind.duckdb &lt; sql/02_funnel.sql
 duckdb northwind.duckdb &lt; sql/03_decomposition.sql</pre>
+<details><summary>00_load_raw.sql — load the CSVs (local only)</summary><pre>{sqlfile('sql/00_load_raw.sql')}</pre></details>
 <details><summary>01_clean.sql — cleaning rules and analysis base table</summary><pre>{sqlfile('sql/01_clean.sql')}</pre></details>
 <details><summary>02_funnel.sql — funnel, plan split, slices, finance view</summary><pre>{sqlfile('sql/02_funnel.sql')}</pre></details>
 <details><summary>03_decomposition.sql — Kitagawa decomposition</summary><pre>{sqlfile('sql/03_decomposition.sql')}</pre></details>

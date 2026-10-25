@@ -138,7 +138,7 @@ code { font-family:ui-monospace,Menlo,monospace; font-size:0.9em; }
 
 <h3>Signup product vs plan bought</h3>
 <p><code>product_code</code> (what the lead signed up for) and <code>plan</code> (what they bought) are different fields. Free CRM is not a plan you buy; its upgrades show up as Starter deals.</p>
-<div class="two"><div class="tbl"><table class=""><thead><tr><th>Signed up for</th><th>Bought</th><th>Deals</th></tr></thead><tbody><tr><td>FCRM</td><td>Starter</td><td>134</td></tr><tr><td>PRO</td><td>Pro</td><td>361</td></tr><tr><td>STR</td><td>Starter</td><td>985</td></tr></tbody></table></div><div class="tbl"><table class=""><thead><tr><th>Plan</th><th>Amount (after R10)</th><th>Deals</th></tr></thead><tbody><tr><td>Pro</td><td>$0</td><td>8</td></tr><tr><td>Pro</td><td>$110</td><td>357</td></tr><tr><td>Starter</td><td>$0</td><td>22</td></tr><tr><td>Starter</td><td>$35</td><td>1,108</td></tr></tbody></table></div></div>
+<div class="two"><div class="tbl"><table class=""><thead><tr><th>Signed up for</th><th>Bought</th><th>Deals</th></tr></thead><tbody><tr><td>FCRM</td><td>Starter</td><td>134</td></tr><tr><td>PRO</td><td>Pro</td><td>361</td></tr><tr><td>STR</td><td>Starter</td><td>985</td></tr></tbody></table></div><div class="tbl"><table class=""><thead><tr><th>Plan</th><th>Amount (after R10)</th><th>Deals</th></tr></thead><tbody><tr><td>Pro</td><td>$0.0</td><td>8</td></tr><tr><td>Pro</td><td>$110.0</td><td>357</td></tr><tr><td>Starter</td><td>$0.0</td><td>22</td></tr><tr><td>Starter</td><td>$35.0</td><td>1,108</td></tr></tbody></table></div></div>
 <p class="note-foot">Counts include $0 deals. Prices didn't change during the period, so this is a packaging change, not a pricing change.</p>
 
 <h2>3. Cleaning rules</h2>
@@ -181,40 +181,79 @@ code { font-family:ui-monospace,Menlo,monospace; font-size:0.9em; }
 </ul>
 
 <h2>7. Reproduce it</h2>
-<p>Requires <a href="https://duckdb.org">DuckDB</a>. From the repo root, run the three files in order. Engine-specific functions (<code>read_csv_auto</code>, <code>date_trunc</code>, <code>date_diff</code>) have direct equivalents in Snowflake or BigQuery.</p>
-<pre>duckdb northwind.duckdb &lt; sql/01_clean.sql
+<p>The queries are written in Snowflake SQL and avoid engine-specific functions, so they also run unchanged in <a href="https://duckdb.org">DuckDB</a> on a laptop. In Snowflake, run 01, 02 and 03 against the <code>sessions</code>, <code>signups</code> and <code>opportunities</code> tables. Locally, run <code>00_load_raw.sql</code> first to load the CSVs into tables with those same names. Run from the folder that contains <code>data/</code>.</p>
+<pre>duckdb northwind.duckdb &lt; sql/00_load_raw.sql
+duckdb northwind.duckdb &lt; sql/01_clean.sql
 duckdb northwind.duckdb &lt; sql/02_funnel.sql
 duckdb northwind.duckdb &lt; sql/03_decomposition.sql</pre>
-<details><summary>01_clean.sql — cleaning rules and analysis base table</summary><pre>-- =====================================================================
--- 01_clean.sql — Northwind CRM: raw CSVs -&gt; cleaned tables
--- Engine: DuckDB (standard SQL; reads CSVs directly).
--- Every rule is numbered (R1..R14) and matches the data-validation doc.
+<details><summary>00_load_raw.sql — load the CSVs (local only)</summary><pre>-- =====================================================================
+-- 00_load_raw.sql  —  LOCAL ONLY (DuckDB)
+-- In Snowflake, skip this file: sessions, signups and opportunities
+-- already exist as tables. Locally, this creates them from the CSVs.
+-- Run from the folder that contains the data/ subfolder.
 -- =====================================================================
 
+CREATE OR REPLACE TABLE sessions      AS SELECT * FROM read_csv_auto(&#x27;data/sessions.csv&#x27;);
+CREATE OR REPLACE TABLE signups       AS SELECT * FROM read_csv_auto(&#x27;data/signups.csv&#x27;);
+CREATE OR REPLACE TABLE opportunities AS SELECT * FROM read_csv_auto(&#x27;data/opportunities.csv&#x27;);</pre></details>
+<details><summary>01_clean.sql — cleaning rules and analysis base table</summary><pre>-- =====================================================================
+-- 01_clean.sql — Clean the three raw tables and join them
+-- Snowflake SQL (also runs in DuckDB). Rule ids R1–R14 match the
+-- Data methodology doc. Flags are 1/0 so they can be summed and averaged.
+--
+-- WHAT WE HAD TO FIX SO THE DATA IS USABLE
+-- (applied in 01_clean.sql; 02 and 03 only read the cleaned tables)
+--
+-- | Rule | Table         | Problem found                               | What we did                         | Rows   |
+-- |------|---------------|---------------------------------------------|-------------------------------------|--------|
+-- | R1   | sessions      | Same channel written 12 ways (&quot;direct &quot;)    | Map to 7 channel names              | 1,284  |
+-- | R2   | sessions      | 135 URL spellings of ~20 pages              | Clean URL, group into 7 page types  | all    |
+-- | R3   | sessions      | Visit with no visitor id                    | Keep, mark is_visitor_missing       | 300    |
+-- | R4   | signups       | Exact duplicate rows                        | Remove                              | 66     |
+-- | R5   | signups       | Fake company sizes (-5, 999,999)            | Set to unknown                      | 30     |
+-- | R6   | signups       | Same lead twice with different details      | Keep the most complete row          | 4 leads|
+-- | R7   | signups       | Signup dated July, after the data ends      | Use the date of its visit           | 8      |
+-- | R8   | signups       | Points to a visit that doesn&#x27;t exist        | Keep, mark is_session_orphan        | 25     |
+-- | R9   | opportunities | Exact duplicate rows                        | Remove                              | 18     |
+-- | R10  | opportunities | Amount 1,000x the price (35,000 / 110,000)  | Divide by 1,000                     | 6      |
+-- | R11  | opportunities | $0 deals (nobody pays)                      | Keep, mark is_zero_amount; not wins | 30     |
+-- | R12  | opportunities | Negative days_to_close (sign bug)           | Recompute from the dates            | 10     |
+-- | R13  | opportunities | Points to a lead that doesn&#x27;t exist         | Keep, mark is_lead_orphan           | 15     |
+-- | R14  | signups       | Country written as the text &#x27;N/A&#x27;           | Set to unknown                      | 25     |
+--
+-- =====================================================================
+
+
 -- ---------------------------------------------------------------------
--- SESSIONS  (1 row = 1 website visit)
+-- STEP 1. sessions_clean — one row per website visit
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE sessions_clean AS
-WITH raw AS (
-    SELECT * FROM read_csv_auto(&#x27;data/sessions.csv&#x27;)
-),
-url AS (
+WITH with_clean_url AS (
     SELECT
-        *,
-        -- R2: normalize URL: lowercase, drop query string, drop geo prefix, drop trailing slash
-        COALESCE(NULLIF(
-            regexp_replace(
-                regexp_replace(lower(split_part(entry_url, &#x27;?&#x27;, 1)), &#x27;^/(uk|in|de|au|ca)(/|$)&#x27;, &#x27;/&#x27;),
-            &#x27;/+$&#x27;, &#x27;&#x27;),
-        &#x27;&#x27;), &#x27;/&#x27;) AS url_norm
-    FROM raw
+        s.*,
+        -- R2. Make the URL comparable. Read it inside-out:
+        --   1) cut everything after &quot;?&quot;         /pricing?plan=starter -&gt; /pricing
+        --   2) lowercase                        /HOME -&gt; /home
+        --   3) drop the country prefix          /uk/blog/x -&gt; /blog/x
+        --   4) drop the trailing slash          /pricing/ -&gt; /pricing
+        --   5) if nothing is left, it was &quot;/&quot;   (the home page)
+        COALESCE(
+            NULLIF(
+                REGEXP_REPLACE(
+                    REGEXP_REPLACE(LOWER(SPLIT_PART(s.entry_url, &#x27;?&#x27;, 1)),
+                                   &#x27;^/(uk|in|de|au|ca)(/|$)&#x27;, &#x27;/&#x27;),
+                    &#x27;/+$&#x27;, &#x27;&#x27;),
+                &#x27;&#x27;),
+            &#x27;/&#x27;) AS url_clean
+    FROM sessions s
 )
 SELECT
     session_id,
     visitor_id,
-    CAST(event_dt AS DATE)                  AS event_dt,
-    -- R1: channel labels have casing / trailing-space variants (&quot;Display &quot;, &quot;direct&quot;)
-    CASE lower(trim(mktg_channel))
+    CAST(event_dt AS DATE) AS event_dt,
+
+    -- R1. Same channel written different ways (&quot;Display &quot;, &quot;direct&quot;) -&gt; one name
+    CASE LOWER(TRIM(mktg_channel))
         WHEN &#x27;direct&#x27;         THEN &#x27;Direct&#x27;
         WHEN &#x27;display&#x27;        THEN &#x27;Display&#x27;
         WHEN &#x27;email&#x27;          THEN &#x27;Email&#x27;
@@ -222,296 +261,447 @@ SELECT
         WHEN &#x27;paid search&#x27;    THEN &#x27;Paid Search&#x27;
         WHEN &#x27;referral&#x27;       THEN &#x27;Referral&#x27;
         WHEN &#x27;social&#x27;         THEN &#x27;Social&#x27;
-    END                                      AS mktg_channel,
+    END AS mktg_channel,
+
     geo,
     device_type,
     entry_url,
-    -- R2: 135 raw URLs -&gt; 7 page types
+
+    -- R2. Group the clean URL into 7 page types
     CASE
-        WHEN url_norm LIKE &#x27;/blog%&#x27; OR url_norm LIKE &#x27;/resources%&#x27;    THEN &#x27;content&#x27;
-        WHEN url_norm IN (&#x27;/&#x27;, &#x27;/home&#x27;, &#x27;/index&#x27;)                     THEN &#x27;home&#x27;
-        WHEN url_norm LIKE &#x27;/pricing%&#x27; OR url_norm LIKE &#x27;/plans%&#x27;     THEN &#x27;pricing&#x27;
-        WHEN url_norm IN (&#x27;/offers/free-crm&#x27;, &#x27;/lp/free-crm&#x27;)         THEN &#x27;free_crm_lp&#x27;
-        WHEN url_norm = &#x27;/get/starter-trial&#x27;                          THEN &#x27;trial_lp&#x27;
-        WHEN url_norm IN (&#x27;/go/crm&#x27;, &#x27;/campaign/spring-2026&#x27;)         THEN &#x27;campaign_lp&#x27;
-        WHEN url_norm LIKE &#x27;/product%&#x27; OR url_norm LIKE &#x27;/features%&#x27;  THEN &#x27;product&#x27;
+        WHEN url_clean LIKE &#x27;/blog%&#x27;    OR url_clean LIKE &#x27;/resources%&#x27; THEN &#x27;content&#x27;
+        WHEN url_clean IN (&#x27;/&#x27;, &#x27;/home&#x27;, &#x27;/index&#x27;)                      THEN &#x27;home&#x27;
+        WHEN url_clean LIKE &#x27;/pricing%&#x27; OR url_clean LIKE &#x27;/plans%&#x27;     THEN &#x27;pricing&#x27;
+        WHEN url_clean IN (&#x27;/offers/free-crm&#x27;, &#x27;/lp/free-crm&#x27;)          THEN &#x27;free_crm_lp&#x27;
+        WHEN url_clean = &#x27;/get/starter-trial&#x27;                           THEN &#x27;trial_lp&#x27;
+        WHEN url_clean IN (&#x27;/go/crm&#x27;, &#x27;/campaign/spring-2026&#x27;)          THEN &#x27;campaign_lp&#x27;
+        WHEN url_clean LIKE &#x27;/product%&#x27; OR url_clean LIKE &#x27;/features%&#x27;  THEN &#x27;product&#x27;
         ELSE &#x27;other&#x27;
-    END                                      AS page_type,
+    END AS page_type,
+
     converted_flag,
-    -- R3: 300 sessions without visitor_id: kept, flagged
-    visitor_id IS NULL                       AS visitor_missing
-FROM url;
+
+    -- R3. 300 visits have no visitor id. Keep them, just mark them.
+    CASE WHEN visitor_id IS NULL THEN 1 ELSE 0 END AS is_visitor_missing
+FROM with_clean_url;
+
 
 -- ---------------------------------------------------------------------
--- SIGNUPS  (1 row = 1 lead = 1 product signup)
+-- STEP 2. signups_clean — one row per lead
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE signups_clean AS
-WITH dedup AS (
-    -- R4: drop exact duplicate rows
-    SELECT DISTINCT * FROM read_csv_auto(&#x27;data/signups.csv&#x27;)
+WITH no_duplicates AS (
+    -- R4. Remove rows that are exact copies of another row
+    SELECT DISTINCT * FROM signups
 ),
-sized AS (
+fixed_values AS (
     SELECT
-        * REPLACE (
-            -- R5: company_size sentinels (-5, 999999) -&gt; NULL
-            CASE WHEN company_size &lt; 1 OR company_size &gt;= 999999 THEN NULL
-                 ELSE company_size END AS company_size,
-            -- R14: geo holds the literal text &#x27;N/A&#x27; in 25 rows (plus 25 true NULLs) -&gt; NULL
-            NULLIF(trim(geo), &#x27;N/A&#x27;) AS geo
-        )
-    FROM dedup
+        lead_id,
+        visitor_id,
+        session_id,
+        CAST(created_dt AS DATE) AS created_dt,
+        mktg_channel,
+        product_code,
+        -- R14. The text &#x27;N/A&#x27; is not a country -&gt; treat it as unknown
+        NULLIF(TRIM(geo), &#x27;N/A&#x27;) AS geo,
+        -- R5. -5 or 999,999 employees are not real -&gt; treat as unknown
+        CASE WHEN company_size &lt; 1 OR company_size &gt;= 999999 THEN NULL
+             ELSE company_size END AS company_size
+    FROM no_duplicates
 ),
 ranked AS (
-    -- R6: same lead_id twice with conflicting attributes -&gt; keep the most complete row
+    -- R6. A few leads appear twice with different details.
+    -- Score each row by how complete it is (0, 1 or 2 known fields)
+    -- and number the rows of each lead from most to least complete.
     SELECT
-        *,
+        f.*,
         ROW_NUMBER() OVER (
             PARTITION BY lead_id
-            ORDER BY (geo IS NOT NULL)::INT + (company_size IS NOT NULL)::INT DESC
-        ) AS rn
-    FROM sized
+            ORDER BY (CASE WHEN geo IS NOT NULL THEN 1 ELSE 0 END)
+                   + (CASE WHEN company_size IS NOT NULL THEN 1 ELSE 0 END) DESC
+        ) AS row_rank
+    FROM fixed_values f
 )
 SELECT
     r.lead_id,
     r.visitor_id,
     r.session_id,
-    -- R7: 8 signups dated July (outside window); 99.9% of signups happen the same
-    --     day as their session -&gt; replace with the session date
-    CASE WHEN CAST(r.created_dt AS DATE) &gt; DATE &#x27;2026-06-30&#x27; AND s.event_dt IS NOT NULL
-         THEN s.event_dt ELSE CAST(r.created_dt AS DATE) END          AS created_dt,
-    CAST(r.created_dt AS DATE) &gt; DATE &#x27;2026-06-30&#x27;
-         AND s.event_dt IS NOT NULL                                     AS created_dt_imputed,
+
+    -- R7. 8 signups are dated in July, after the data ends. Every signup
+    -- happens on the same day as its visit, so use the visit date instead.
+    CASE WHEN r.created_dt &gt; DATE &#x27;2026-06-30&#x27; AND s.event_dt IS NOT NULL
+         THEN s.event_dt
+         ELSE r.created_dt END AS created_dt,
+    CASE WHEN r.created_dt &gt; DATE &#x27;2026-06-30&#x27; AND s.event_dt IS NOT NULL
+         THEN 1 ELSE 0 END AS is_date_fixed,
+
     r.mktg_channel,
     r.product_code,
-    CASE r.product_code WHEN &#x27;STR&#x27; THEN &#x27;Starter&#x27;
-                        WHEN &#x27;PRO&#x27; THEN &#x27;Pro&#x27;
-                        WHEN &#x27;FCRM&#x27; THEN &#x27;Free CRM&#x27; END                 AS product,
+    CASE r.product_code
+        WHEN &#x27;STR&#x27;  THEN &#x27;Starter&#x27;
+        WHEN &#x27;PRO&#x27;  THEN &#x27;Pro&#x27;
+        WHEN &#x27;FCRM&#x27; THEN &#x27;Free CRM&#x27;
+    END AS product,
     r.geo,
     r.company_size,
-    -- R8: session_id not found in sessions (malformed key S9xxxxxxx): kept, flagged
-    s.session_id IS NULL                                                AS session_orphan
+
+    -- R8. 25 signups point to a visit that doesn&#x27;t exist (broken id).
+    -- Keep them, just mark them.
+    CASE WHEN s.session_id IS NULL THEN 1 ELSE 0 END AS is_session_orphan
 FROM ranked r
-LEFT JOIN sessions_clean s USING (session_id)
-WHERE r.rn = 1;
+LEFT JOIN sessions_clean s
+       ON s.session_id = r.session_id
+WHERE r.row_rank = 1;          -- keep only the most complete row per lead
+
 
 -- ---------------------------------------------------------------------
--- OPPORTUNITIES  (1 row = 1 closed deal)
+-- STEP 3. opportunities_clean — one row per closed deal
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE opportunities_clean AS
-WITH dedup AS (
-    -- R9: drop exact duplicate rows
-    SELECT DISTINCT * FROM read_csv_auto(&#x27;data/opportunities.csv&#x27;)
+WITH no_duplicates AS (
+    -- R9. Remove rows that are exact copies of another row
+    SELECT DISTINCT * FROM opportunities
 )
 SELECT
     o.opp_id,
     o.lead_id,
-    CAST(o.close_dt AS DATE)                                            AS close_dt,
+    CAST(o.close_dt AS DATE) AS close_dt,
     o.plan,
-    -- R10: amounts 1000x list price (35000 / 110000) -&gt; unit error, divide by 1000
-    CASE WHEN o.amount IN (35000, 110000) THEN o.amount // 1000
-         ELSE o.amount END                                              AS amount,
-    -- R11: $0 deals: closed but not paying -&gt; excluded from &quot;paying customers&quot;
-    o.amount = 0                                                        AS zero_amount,
-    -- R12: negative days_to_close is a sign bug -&gt; recompute from dates
-    COALESCE(date_diff(&#x27;day&#x27;, g.created_dt, CAST(o.close_dt AS DATE)),
-             abs(o.days_to_close))                                      AS days_to_close,
-    -- R13: lead_id not found in signups (malformed key G9xxxxxx): kept, flagged
-    g.lead_id IS NULL                                                   AS lead_orphan
-FROM dedup o
-LEFT JOIN signups_clean g USING (lead_id);
+
+    -- R10. 35,000 and 110,000 are the list prices x1000 (unit error)
+    CASE WHEN o.amount IN (35000, 110000) THEN o.amount / 1000
+         ELSE o.amount END AS amount,
+
+    -- R11. $0 deals closed but nobody pays -&gt; not a paying customer
+    CASE WHEN o.amount = 0 THEN 1 ELSE 0 END AS is_zero_amount,
+
+    -- R12. Some days_to_close are negative (sign bug).
+    -- Recompute from the dates; if the lead is missing, flip the sign.
+    COALESCE(CAST(o.close_dt AS DATE) - g.created_dt,
+             ABS(o.days_to_close)) AS days_to_close,
+
+    -- R13. 15 deals point to a lead that doesn&#x27;t exist (broken id).
+    -- Keep them, just mark them.
+    CASE WHEN g.lead_id IS NULL THEN 1 ELSE 0 END AS is_lead_orphan
+FROM no_duplicates o
+LEFT JOIN signups_clean g
+       ON g.lead_id = o.lead_id;
+
 
 -- ---------------------------------------------------------------------
--- ANALYSIS BASE: 1 row per signup with origin attributes + 30-day win
+-- STEP 4. signup_outcomes — one row per signup, everything we need
+-- to analyze it: where it came from, which SKU, and did it pay
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE signup_outcomes AS
 WITH first_visit AS (
+    -- The first day each visitor came to the site
     SELECT visitor_id, MIN(event_dt) AS first_visit_dt
     FROM sessions_clean
     WHERE visitor_id IS NOT NULL
     GROUP BY visitor_id
+),
+paid_deals AS (
+    -- Only deals where someone actually pays
+    SELECT * FROM opportunities_clean WHERE is_zero_amount = 0
 )
 SELECT
     g.*,
-    date_trunc(&#x27;month&#x27;, g.created_dt)::DATE                             AS signup_month,
-    CASE WHEN g.created_dt &lt; DATE &#x27;2026-04-01&#x27; THEN &#x27;Q1&#x27; ELSE &#x27;Q2&#x27; END  AS period,
+
+    -- Cohort = the month the lead signed up
+    CAST(DATE_TRUNC(&#x27;month&#x27;, g.created_dt) AS DATE) AS signup_month,
+    CASE WHEN g.created_dt &lt; DATE &#x27;2026-04-01&#x27; THEN &#x27;Q1&#x27; ELSE &#x27;Q2&#x27; END AS period,
+
+    -- Where the signup came from (its visit)
     s.device_type,
     s.page_type,
     CASE WHEN fv.first_visit_dt &lt; g.created_dt THEN &#x27;Returning&#x27; ELSE &#x27;New&#x27; END AS visitor_type,
-    CASE WHEN g.company_size IS NULL THEN &#x27;Unknown&#x27;
-         WHEN g.company_size &lt;= 10  THEN &#x27;1-10&#x27;
-         WHEN g.company_size &lt;= 50  THEN &#x27;11-50&#x27;
-         WHEN g.company_size &lt;= 200 THEN &#x27;51-200&#x27;
-         ELSE &#x27;201+&#x27; END                                                AS company_size_bucket,
-    o.plan                                                              AS won_plan,
-    o.amount                                                            AS won_amount,
+    CASE
+        WHEN g.company_size IS NULL THEN &#x27;Unknown&#x27;
+        WHEN g.company_size &lt;= 10   THEN &#x27;1-10&#x27;
+        WHEN g.company_size &lt;= 50   THEN &#x27;11-50&#x27;
+        WHEN g.company_size &lt;= 200  THEN &#x27;51-200&#x27;
+        ELSE &#x27;201+&#x27;
+    END AS company_size_bucket,
+
+    -- The deal it turned into, if any
+    o.plan   AS won_plan,
+    o.amount AS won_amount,
     o.days_to_close,
-    -- Win definition: paying (amount &gt; 0) opp closed within 30 days of signup
-    (o.opp_id IS NOT NULL AND o.days_to_close &lt;= 30)                    AS win_30d
+
+    -- THE WIN DEFINITION: a paying deal closed within 30 days of signup.
+    -- 1 = paying customer, 0 = not. Summing this column counts wins.
+    CASE WHEN o.opp_id IS NOT NULL AND o.days_to_close &lt;= 30 THEN 1 ELSE 0 END AS is_win
 FROM signups_clean g
-LEFT JOIN sessions_clean s       USING (session_id)
-LEFT JOIN first_visit fv         ON fv.visitor_id = g.visitor_id
-LEFT JOIN opportunities_clean o  ON o.lead_id = g.lead_id AND NOT o.zero_amount;</pre></details>
+LEFT JOIN sessions_clean s ON s.session_id = g.session_id
+LEFT JOIN first_visit fv   ON fv.visitor_id = g.visitor_id
+LEFT JOIN paid_deals o     ON o.lead_id = g.lead_id;</pre></details>
 <details><summary>02_funnel.sql — funnel, plan split, slices, finance view</summary><pre>-- =====================================================================
--- 02_funnel.sql — Funnel metrics on cleaned data. Requires 01_clean.sql.
--- Win = paying opp (amount &gt; 0) closed within 30 days of signup.
+-- 02_funnel.sql — Funnel metrics on the cleaned data
+-- Snowflake SQL (also runs in DuckDB). Run after 01_clean.sql.
+-- Win = paying deal (amount &gt; $0) closed within 30 days of signup.
+--
+-- WHAT WE HAD TO FIX SO THE DATA IS USABLE
+-- (applied in 01_clean.sql; 02 and 03 only read the cleaned tables)
+--
+-- | Rule | Table         | Problem found                               | What we did                         | Rows   |
+-- |------|---------------|---------------------------------------------|-------------------------------------|--------|
+-- | R1   | sessions      | Same channel written 12 ways (&quot;direct &quot;)    | Map to 7 channel names              | 1,284  |
+-- | R2   | sessions      | 135 URL spellings of ~20 pages              | Clean URL, group into 7 page types  | all    |
+-- | R3   | sessions      | Visit with no visitor id                    | Keep, mark is_visitor_missing       | 300    |
+-- | R4   | signups       | Exact duplicate rows                        | Remove                              | 66     |
+-- | R5   | signups       | Fake company sizes (-5, 999,999)            | Set to unknown                      | 30     |
+-- | R6   | signups       | Same lead twice with different details      | Keep the most complete row          | 4 leads|
+-- | R7   | signups       | Signup dated July, after the data ends      | Use the date of its visit           | 8      |
+-- | R8   | signups       | Points to a visit that doesn&#x27;t exist        | Keep, mark is_session_orphan        | 25     |
+-- | R9   | opportunities | Exact duplicate rows                        | Remove                              | 18     |
+-- | R10  | opportunities | Amount 1,000x the price (35,000 / 110,000)  | Divide by 1,000                     | 6      |
+-- | R11  | opportunities | $0 deals (nobody pays)                      | Keep, mark is_zero_amount; not wins | 30     |
+-- | R12  | opportunities | Negative days_to_close (sign bug)           | Recompute from the dates            | 10     |
+-- | R13  | opportunities | Points to a lead that doesn&#x27;t exist         | Keep, mark is_lead_orphan           | 15     |
+-- | R14  | signups       | Country written as the text &#x27;N/A&#x27;           | Set to unknown                      | 25     |
+--
 -- =====================================================================
 
--- 1. Monthly cohort funnel: sessions -&gt; signups -&gt; 30-day wins -&gt; new MRR
+
+-- ---------------------------------------------------------------------
+-- STEP 1. monthly_funnel — the whole funnel by signup month
+-- visits -&gt; signups -&gt; paying customers -&gt; deal value
+-- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE monthly_funnel AS
-WITH sess AS (
-    SELECT date_trunc(&#x27;month&#x27;, event_dt)::DATE AS month, COUNT(*) AS sessions
-    FROM sessions_clean GROUP BY 1
+WITH visits_by_month AS (
+    SELECT CAST(DATE_TRUNC(&#x27;month&#x27;, event_dt) AS DATE) AS month,
+           COUNT(*) AS sessions
+    FROM sessions_clean
+    GROUP BY 1
 ),
-sig AS (
+signups_by_month AS (
     SELECT signup_month AS month,
-           COUNT(*)                                             AS signups,
-           SUM(win_30d::INT)                                    AS wins_30d,
-           SUM(CASE WHEN win_30d THEN won_amount ELSE 0 END)    AS new_mrr_30d
-    FROM signup_outcomes GROUP BY 1
+           COUNT(*)                     AS signups,
+           SUM(is_win)                  AS wins_30d,          -- is_win is 1/0, so SUM counts wins
+           SUM(is_win * won_amount)     AS deal_value_30d     -- amount only counts for wins
+    FROM signup_outcomes
+    GROUP BY 1
 )
-SELECT month, sessions, signups, wins_30d, new_mrr_30d,
-       ROUND(100.0 * signups  / sessions, 2) AS sess_to_signup_pct,
-       ROUND(100.0 * wins_30d / signups, 1)  AS signup_to_win_pct,
-       ROUND(100.0 * wins_30d / sessions, 2) AS sess_to_win_pct
-FROM sess JOIN sig USING (month)
+SELECT
+    month,
+    sessions,
+    signups,
+    wins_30d,
+    deal_value_30d,
+    ROUND(100.0 * signups  / sessions, 2) AS sess_to_signup_pct,
+    ROUND(100.0 * wins_30d / signups, 1)  AS signup_to_win_pct,
+    ROUND(100.0 * wins_30d / sessions, 2) AS sess_to_win_pct
+FROM visits_by_month
+JOIN signups_by_month USING (month)
 ORDER BY month;
 
--- 1b. Weekly cohort funnel (Monday-start weeks). Only complete 7-day weeks are
---     kept: the first (Jan 1-4) and last (Jun 29-30) weeks are partial.
+
+-- ---------------------------------------------------------------------
+-- STEP 2. weekly_funnel — same idea, by week (weeks start on Monday)
+-- Only full 7-day weeks: Jan 1-4 and Jun 29-30 are cut off.
+-- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE weekly_funnel AS
-SELECT date_trunc(&#x27;week&#x27;, created_dt)::DATE         AS week_start,
-       COUNT(*)                                     AS signups,
-       SUM((product = &#x27;Free CRM&#x27;)::INT)             AS free_crm_signups,
-       SUM(win_30d::INT)                            AS wins_30d,
-       ROUND(100.0 * AVG(win_30d::INT), 1)          AS signup_to_win_pct
+SELECT
+    CAST(DATE_TRUNC(&#x27;week&#x27;, created_dt) AS DATE)             AS week_start,
+    COUNT(*)                                                 AS signups,
+    SUM(CASE WHEN product = &#x27;Free CRM&#x27; THEN 1 ELSE 0 END)    AS free_crm_signups,
+    SUM(is_win)                                              AS wins_30d,
+    ROUND(100.0 * AVG(is_win), 1)                            AS signup_to_win_pct   -- average of 1/0 = conversion rate
 FROM signup_outcomes
 GROUP BY 1
-HAVING date_diff(&#x27;day&#x27;, MIN(created_dt), MAX(created_dt)) = 6   -- full week only
+HAVING MAX(created_dt) - MIN(created_dt) = 6                 -- Monday to Sunday = 6 days apart
 ORDER BY 1;
 
--- 2. Same funnel split by product (mix, conversion, wins, MRR)
+
+-- ---------------------------------------------------------------------
+-- STEP 3. product_funnel — the funnel split by SKU, per month
+-- mix_pct = this SKU&#x27;s share of the month&#x27;s signups
+-- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE product_funnel AS
-SELECT signup_month AS month, product,
-       COUNT(*)                                                      AS signups,
-       ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY signup_month), 1) AS mix_pct,
-       SUM(win_30d::INT)                                             AS wins_30d,
-       ROUND(100.0 * AVG(win_30d::INT), 1)                           AS signup_to_win_pct,
-       SUM(CASE WHEN win_30d THEN won_amount ELSE 0 END)             AS new_mrr_30d
+SELECT
+    signup_month AS month,
+    product,
+    COUNT(*)                                     AS signups,
+    -- window function: divide by the total signups of the same month
+    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (PARTITION BY signup_month), 1) AS mix_pct,
+    SUM(is_win)                                  AS wins_30d,
+    ROUND(100.0 * AVG(is_win), 1)                AS signup_to_win_pct,
+    SUM(is_win * won_amount)                     AS deal_value_30d
 FROM signup_outcomes
 GROUP BY signup_month, product
 ORDER BY month, product;
 
--- 3. Signup -&gt; win conversion by origin slice, monthly + Q1 vs Q2
---    (long format: one row per dimension x value x month)
+
+-- ---------------------------------------------------------------------
+-- STEP 4. slice_conversion — conversion for every origin slice
+-- Trick: stack the table 6 times (one per dimension) with UNION ALL,
+-- so a single GROUP BY gives every slice at once.
+-- ---------------------------------------------------------------------
 CREATE OR REPLACE TABLE slice_conversion AS
-WITH long AS (
-    SELECT signup_month, period, win_30d, product, &#x27;channel&#x27;      AS dimension, mktg_channel        AS value FROM signup_outcomes
-    UNION ALL SELECT signup_month, period, win_30d, product, &#x27;entry_page&#x27;,   page_type           FROM signup_outcomes
-    UNION ALL SELECT signup_month, period, win_30d, product, &#x27;device&#x27;,       device_type         FROM signup_outcomes
-    UNION ALL SELECT signup_month, period, win_30d, product, &#x27;visitor_type&#x27;, visitor_type        FROM signup_outcomes
-    UNION ALL SELECT signup_month, period, win_30d, product, &#x27;company_size&#x27;, company_size_bucket FROM signup_outcomes
-    UNION ALL SELECT signup_month, period, win_30d, product, &#x27;geo&#x27;,          COALESCE(geo, &#x27;Unknown&#x27;) FROM signup_outcomes
+WITH stacked AS (
+    SELECT signup_month, period, is_win, product, &#x27;channel&#x27;      AS dimension, mktg_channel        AS value FROM signup_outcomes
+    UNION ALL
+    SELECT signup_month, period, is_win, product, &#x27;entry_page&#x27;   AS dimension, page_type           AS value FROM signup_outcomes
+    UNION ALL
+    SELECT signup_month, period, is_win, product, &#x27;device&#x27;       AS dimension, device_type         AS value FROM signup_outcomes
+    UNION ALL
+    SELECT signup_month, period, is_win, product, &#x27;visitor_type&#x27; AS dimension, visitor_type        AS value FROM signup_outcomes
+    UNION ALL
+    SELECT signup_month, period, is_win, product, &#x27;company_size&#x27; AS dimension, company_size_bucket AS value FROM signup_outcomes
+    UNION ALL
+    SELECT signup_month, period, is_win, product, &#x27;geo&#x27;          AS dimension, COALESCE(geo, &#x27;Unknown&#x27;) AS value FROM signup_outcomes
 )
-SELECT dimension, value,
-       strftime(signup_month, &#x27;%Y-%m&#x27;)                   AS month,
-       period,
-       COUNT(*)                                          AS signups,
-       SUM(win_30d::INT)                                 AS wins_30d,
-       ROUND(100.0 * AVG(win_30d::INT), 1)               AS signup_to_win_pct,
-       ROUND(100.0 * AVG((product = &#x27;Free CRM&#x27;)::INT), 1) AS free_crm_share_pct
-FROM long
-WHERE value IS NOT NULL            -- drops 25 signups with no matching session
+SELECT
+    dimension,
+    value,
+    signup_month AS month,
+    period,
+    COUNT(*)                                                           AS signups,
+    SUM(is_win)                                                        AS wins_30d,
+    ROUND(100.0 * AVG(is_win), 1)                                      AS signup_to_win_pct,
+    ROUND(100.0 * AVG(CASE WHEN product = &#x27;Free CRM&#x27; THEN 1 ELSE 0 END), 1) AS free_crm_share_pct
+FROM stacked
+WHERE value IS NOT NULL            -- the 25 signups with no visit have no page/device
 GROUP BY dimension, value, signup_month, period
 ORDER BY dimension, value, month;
 
--- 4. Finance view: paying customers by CLOSE month (incl. orphan opps)
-CREATE OR REPLACE TABLE finance_view AS
-SELECT date_trunc(&#x27;month&#x27;, close_dt)::DATE AS close_month,
-       COUNT(*) FILTER (WHERE NOT zero_amount)         AS paying_customers,
-       COUNT(*)                                         AS all_closed_opps,
-       SUM(amount)                                      AS new_mrr
-FROM opportunities_clean
-GROUP BY 1 ORDER BY 1;
 
-SELECT * FROM monthly_funnel;</pre></details>
+-- ---------------------------------------------------------------------
+-- STEP 5. finance_view — customers by the month the deal CLOSED
+-- (how finance counts). Includes the 15 deals with a broken lead id.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE TABLE finance_view AS
+SELECT
+    CAST(DATE_TRUNC(&#x27;month&#x27;, close_dt) AS DATE)            AS close_month,
+    SUM(CASE WHEN is_zero_amount = 0 THEN 1 ELSE 0 END)    AS paying_customers,
+    COUNT(*)                                               AS all_closed_opps,
+    SUM(amount)                                            AS deal_value
+FROM opportunities_clean
+GROUP BY 1
+ORDER BY 1;</pre></details>
 <details><summary>03_decomposition.sql — Kitagawa decomposition</summary><pre>-- =====================================================================
--- 03_decomposition.sql — Kitagawa decomposition of the change in
--- paying customers (30-day wins) per month, Q1 vs Q2 2026.
+-- 03_decomposition.sql — How much of the drop in paying customers
+-- comes from MORE SIGNUPS, a different SKU MIX, or CONVERSION changes
+-- Snowflake SQL (also runs in DuckDB). Run after 01_clean.sql.
 --
---   Wins = N x R            N = signups / month,  R = blended conversion
---   R    = SUM_i m_i x r_i  m_i = product mix share, r_i = product conversion
+-- WHAT WE HAD TO FIX SO THE DATA IS USABLE
+-- (applied in 01_clean.sql; 02 and 03 only read the cleaned tables)
 --
--- Exact symmetric (Kitagawa) split, using period averages (bar):
---   dWins  = dN x R_bar                        -&gt; VOLUME effect
---          + N_bar x SUM_i dm_i x r_bar_i      -&gt; MIX effect   (by product)
---          + N_bar x SUM_i m_bar_i x dr_i      -&gt; RATE effect  (by product)
+-- | Rule | Table         | Problem found                               | What we did                         | Rows   |
+-- |------|---------------|---------------------------------------------|-------------------------------------|--------|
+-- | R1   | sessions      | Same channel written 12 ways (&quot;direct &quot;)    | Map to 7 channel names              | 1,284  |
+-- | R2   | sessions      | 135 URL spellings of ~20 pages              | Clean URL, group into 7 page types  | all    |
+-- | R3   | sessions      | Visit with no visitor id                    | Keep, mark is_visitor_missing       | 300    |
+-- | R4   | signups       | Exact duplicate rows                        | Remove                              | 66     |
+-- | R5   | signups       | Fake company sizes (-5, 999,999)            | Set to unknown                      | 30     |
+-- | R6   | signups       | Same lead twice with different details      | Keep the most complete row          | 4 leads|
+-- | R7   | signups       | Signup dated July, after the data ends      | Use the date of its visit           | 8      |
+-- | R8   | signups       | Points to a visit that doesn&#x27;t exist        | Keep, mark is_session_orphan        | 25     |
+-- | R9   | opportunities | Exact duplicate rows                        | Remove                              | 18     |
+-- | R10  | opportunities | Amount 1,000x the price (35,000 / 110,000)  | Divide by 1,000                     | 6      |
+-- | R11  | opportunities | $0 deals (nobody pays)                      | Keep, mark is_zero_amount; not wins | 30     |
+-- | R12  | opportunities | Negative days_to_close (sign bug)           | Recompute from the dates            | 10     |
+-- | R13  | opportunities | Points to a lead that doesn&#x27;t exist         | Keep, mark is_lead_orphan           | 15     |
+-- | R14  | signups       | Country written as the text &#x27;N/A&#x27;           | Set to unknown                      | 25     |
 --
--- Assumption: Free CRM did not exist in Q1, so it has no Q1 rate.
--- We set r_Q1(Free) = r_Q2(Free): Free contributes no rate effect and its
--- whole impact is counted as mix. Requires 01_clean.sql.
+--
+-- THE IDEA (Kitagawa decomposition)
+--   Wins per month = Signups per month  x  Blended conversion
+--   Blended conversion = sum over SKUs of (SKU share of signups x SKU conversion)
+--
+--   Between Q1 and Q2 three things changed: signups, SKU mix and SKU conversion.
+--   We split the change in wins into three pieces, using the average of both
+--   periods for everything that is held still. The pieces add up exactly:
+--     VOLUME = change in signups              x  average blended conversion
+--     MIX    = average signups x change in SKU share   x average SKU conversion
+--     RATE   = average signups x average SKU share      x change in SKU conversion
+--
+-- ASSUMPTION: Free CRM didn&#x27;t exist in Q1, so it has no Q1 conversion.
+-- We use its Q2 conversion for both periods, which puts its whole effect in MIX.
 -- =====================================================================
 
+
 CREATE OR REPLACE TABLE kitagawa AS
-WITH by_product AS (
-    SELECT period, product,
-           COUNT(*) / 3.0                AS signups_mo,
-           SUM(win_30d::INT) / 3.0       AS wins_mo
+WITH sku_by_period AS (
+    -- Average signups and wins per month, for each period and SKU
+    SELECT period,
+           product,
+           COUNT(*) / 3.0    AS signups_mo,     -- 3 months per period
+           SUM(is_win) / 3.0 AS wins_mo
     FROM signup_outcomes
-    GROUP BY ALL
+    GROUP BY period, product
 ),
-grid AS (   -- every product in both periods (Free CRM has zero Q1 signups)
-    SELECT p.period, pr.product
-    FROM (VALUES (&#x27;Q1&#x27;), (&#x27;Q2&#x27;)) p(period)
-    CROSS JOIN (SELECT DISTINCT product FROM signup_outcomes) pr
+all_combinations AS (
+    -- Every SKU in both periods, so Free CRM gets a Q1 row (with zeros)
+    SELECT p.period, k.product
+    FROM (VALUES (&#x27;Q1&#x27;), (&#x27;Q2&#x27;)) AS p(period)
+    CROSS JOIN (SELECT DISTINCT product FROM signup_outcomes) AS k
 ),
 filled AS (
-    SELECT g.period, g.product,
+    SELECT a.period,
+           a.product,
            COALESCE(b.signups_mo, 0) AS signups_mo,
            COALESCE(b.wins_mo, 0)    AS wins_mo
-    FROM grid g LEFT JOIN by_product b USING (period, product)
+    FROM all_combinations a
+    LEFT JOIN sku_by_period b
+           ON b.period = a.period AND b.product = a.product
 ),
-shares AS (
-    SELECT *,
-           signups_mo / SUM(signups_mo) OVER (PARTITION BY period) AS mix,
-           wins_mo / NULLIF(signups_mo, 0)                         AS rate
+shares_and_rates AS (
+    SELECT period,
+           product,
+           signups_mo / SUM(signups_mo) OVER (PARTITION BY period) AS mix,    -- SKU share of signups
+           wins_mo / NULLIF(signups_mo, 0)                         AS rate    -- SKU conversion (NULL if no signups)
     FROM filled
 ),
-wide AS (
+side_by_side AS (
+    -- Q1 and Q2 next to each other, one row per SKU
     SELECT q1.product,
-           q1.mix AS mix_q1, q2.mix AS mix_q2,
-           COALESCE(q1.rate, q2.rate) AS rate_q1,   -- Free CRM assumption
-           q2.rate AS rate_q2
-    FROM shares q1 JOIN shares q2 USING (product)
+           q1.mix                       AS mix_q1,
+           q2.mix                       AS mix_q2,
+           COALESCE(q1.rate, q2.rate)   AS rate_q1,     -- the Free CRM assumption
+           q2.rate                      AS rate_q2
+    FROM shares_and_rates q1
+    JOIN shares_and_rates q2
+      ON q2.product = q1.product
     WHERE q1.period = &#x27;Q1&#x27; AND q2.period = &#x27;Q2&#x27;
 ),
-totals AS (
-    SELECT period, SUM(signups_mo) AS n, SUM(wins_mo) AS w, SUM(wins_mo) / SUM(signups_mo) AS r
-    FROM filled GROUP BY period
+period_totals AS (
+    SELECT period,
+           SUM(signups_mo)                  AS n,       -- signups per month
+           SUM(wins_mo)                     AS w,       -- wins per month
+           SUM(wins_mo) / SUM(signups_mo)   AS r        -- blended conversion
+    FROM filled
+    GROUP BY period
 ),
 t AS (
     SELECT q1.n AS n1, q2.n AS n2, q1.w AS w1, q2.w AS w2, q1.r AS r1, q2.r AS r2
-    FROM totals q1, totals q2 WHERE q1.period = &#x27;Q1&#x27; AND q2.period = &#x27;Q2&#x27;
+    FROM period_totals q1
+    JOIN period_totals q2 ON q1.period = &#x27;Q1&#x27; AND q2.period = &#x27;Q2&#x27;
 )
 SELECT &#x27;Q1 wins / month&#x27; AS step, NULL AS product, w1 AS wins FROM t
 UNION ALL
 SELECT &#x27;Volume effect&#x27;, NULL, (n2 - n1) * (r1 + r2) / 2 FROM t
 UNION ALL
-SELECT &#x27;Mix effect&#x27;, w.product,
-       (t.n1 + t.n2) / 2 * (w.mix_q2 - w.mix_q1) * (w.rate_q1 + w.rate_q2) / 2
-FROM wide w, t
+SELECT &#x27;Mix effect&#x27;, s.product,
+       (t.n1 + t.n2) / 2 * (s.mix_q2 - s.mix_q1) * (s.rate_q1 + s.rate_q2) / 2
+FROM side_by_side s CROSS JOIN t
 UNION ALL
-SELECT &#x27;Rate effect&#x27;, w.product,
-       (t.n1 + t.n2) / 2 * (w.mix_q1 + w.mix_q2) / 2 * (w.rate_q2 - w.rate_q1)
-FROM wide w, t
+SELECT &#x27;Rate effect&#x27;, s.product,
+       (t.n1 + t.n2) / 2 * (s.mix_q1 + s.mix_q2) / 2 * (s.rate_q2 - s.rate_q1)
+FROM side_by_side s CROSS JOIN t
 UNION ALL
 SELECT &#x27;Q2 wins / month&#x27;, NULL, w2 FROM t;
 
--- Waterfall view (one bar per effect)
+
+-- The waterfall: one bar per effect. Volume + Mix + Rate = Q2 - Q1, exactly.
 SELECT step, ROUND(SUM(wins), 1) AS wins_per_month
 FROM kitagawa
 GROUP BY step
-ORDER BY CASE step WHEN &#x27;Q1 wins / month&#x27; THEN 1 WHEN &#x27;Volume effect&#x27; THEN 2
-                   WHEN &#x27;Mix effect&#x27; THEN 3 WHEN &#x27;Rate effect&#x27; THEN 4 ELSE 5 END;</pre></details>
+ORDER BY CASE step WHEN &#x27;Q1 wins / month&#x27; THEN 1
+                   WHEN &#x27;Volume effect&#x27;   THEN 2
+                   WHEN &#x27;Mix effect&#x27;      THEN 3
+                   WHEN &#x27;Rate effect&#x27;     THEN 4
+                   ELSE 5 END;</pre></details>
 </main>
 </body>
 </html>

@@ -12,16 +12,16 @@ ROOT = Path(__file__).resolve().parent.parent
 con = duckdb.connect()
 import os
 os.chdir(ROOT)
-for f in ["sql/01_clean.sql", "sql/02_funnel.sql", "sql/03_decomposition.sql"]:
+for f in ["sql/00_load_raw.sql", "sql/01_clean.sql", "sql/02_funnel.sql", "sql/03_decomposition.sql"]:
     con.execute(Path(f).read_text())
 
 q = lambda sql: con.execute(sql).fetchall()
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
 
 # ------------------------------------------------------------------ data
-funnel = q("SELECT sessions, signups, wins_30d, new_mrr_30d, sess_to_signup_pct, signup_to_win_pct, sess_to_win_pct FROM monthly_funnel ORDER BY month")
+funnel = q("SELECT sessions, signups, wins_30d, deal_value_30d, sess_to_signup_pct, signup_to_win_pct, sess_to_win_pct FROM monthly_funnel ORDER BY month")
 prod = {}
-for m, p, n, mix, w, cr, mrr in q("SELECT month, product, signups, mix_pct, wins_30d, signup_to_win_pct, new_mrr_30d FROM product_funnel ORDER BY month"):
+for m, p, n, mix, w, cr, mrr in q("SELECT month, product, signups, mix_pct, wins_30d, signup_to_win_pct, deal_value_30d FROM product_funnel ORDER BY month"):
     prod.setdefault(p, {})[m.month] = dict(n=n, mix=mix, w=int(w), cr=cr, mrr=int(mrr))
 PRODUCTS = ["Starter", "Pro", "Free CRM"]
 
@@ -29,11 +29,11 @@ def pv(p, k, mi):  # product value for month index 1..6
     return prod[p].get(mi, {}).get(k)
 
 per = {r[0]: r[1:] for r in q("""
-    SELECT period, COUNT(*)/3.0, SUM(win_30d::INT)/3.0, 100*AVG(win_30d::INT),
-           SUM(CASE WHEN win_30d THEN won_amount ELSE 0 END)/3.0
+    SELECT period, COUNT(*)/3.0, SUM(is_win)/3.0, 100*AVG(is_win),
+           SUM(is_win * won_amount)/3.0
     FROM signup_outcomes GROUP BY 1""")}
 pp = {(r[0], r[1]): r[2:] for r in q("""
-    SELECT period, product, COUNT(*)/3.0, 100*AVG(win_30d::INT), SUM(win_30d::INT)/3.0
+    SELECT period, product, COUNT(*)/3.0, 100*AVG(is_win), SUM(is_win)/3.0
     FROM signup_outcomes GROUP BY 1,2""")}
 kit = q("SELECT step, product, wins FROM kitagawa")
 kd = {(s, p): w for s, p, w in kit}
@@ -61,7 +61,7 @@ sess_q = {r[0]: r[1] for r in q("""SELECT CASE WHEN event_dt < DATE '2026-04-01'
                                    FROM sessions_clean GROUP BY 1""")}
 
 slices = q("""
-    SELECT dimension, value, period, COUNT(*) AS n, 100*AVG(win_30d::INT) AS cr,
+    SELECT dimension, value, period, COUNT(*) AS n, 100*AVG(is_win) AS cr,
            100*AVG((product='Free CRM')::INT) AS fshare
     FROM (SELECT * FROM signup_outcomes) so,
          LATERAL (SELECT * FROM (VALUES
@@ -76,7 +76,7 @@ for d, v, p, n, cr, fs in slices:
 
 slice_month = {}
 for d, v, m, n, cr in q("SELECT dimension, value, month, signups, signup_to_win_pct FROM slice_conversion WHERE value <> 'Unknown'"):
-    slice_month.setdefault(d, {}).setdefault(v, {})[int(m[-2:])] = (n, cr)
+    slice_month.setdefault(d, {}).setdefault(v, {})[m.month] = (n, cr)
 PRETTY = {"content": "Content (blog, guides)", "home": "Home", "pricing": "Pricing", "product": "Product / features",
           "free_crm_lp": "Free CRM landing page", "trial_lp": "Starter trial landing page", "campaign_lp": "Campaign landing page",
           "desktop": "Desktop", "mobile": "Mobile", "tablet": "Tablet"}
@@ -88,9 +88,9 @@ def order_vals(d, items):
 DIM_KEYS = {"channel": "Channel", "entry_page": "Entry page", "device": "Device",
             "visitor_type": "Visitor", "company_size": "Company size", "geo": "Geo"}
 
-fin = q("SELECT strftime(close_month,'%b'), paying_customers, all_closed_opps, new_mrr FROM finance_view ORDER BY close_month")
+fin = q("SELECT strftime(close_month,'%b'), paying_customers, all_closed_opps, deal_value FROM finance_view ORDER BY close_month")
 fcrm_up = q("""SELECT COUNT(*), MIN(days_to_close), MAX(days_to_close), MEDIAN(days_to_close), MIN(won_plan), MAX(won_plan)
-               FROM signup_outcomes WHERE product='Free CRM' AND win_30d""")[0]
+               FROM signup_outcomes WHERE product='Free CRM' AND is_win = 1""")[0]
 
 # derived headline numbers
 n1, w1, cr1, mrr1 = per["Q1"]
@@ -102,7 +102,7 @@ free_cr = pp[("Q2", "Free CRM")][1]
 trial_w1 = pp[("Q1", "Starter")][2] + pp[("Q1", "Pro")][2]
 trial_w2 = pp[("Q2", "Starter")][2] + pp[("Q2", "Pro")][2]
 lost_wins = trial_w1 - trial_w2
-trial_mrr = {r[0]: r[1] for r in q("""SELECT period, SUM(CASE WHEN win_30d THEN won_amount ELSE 0 END)/3.0
+trial_mrr = {r[0]: r[1] for r in q("""SELECT period, SUM(is_win * won_amount)/3.0
                                       FROM signup_outcomes WHERE product <> 'Free CRM' GROUP BY 1""")}
 lost_mrr = trial_mrr["Q1"] - trial_mrr["Q2"]
 be_wins = 100 * lost_wins / free_n
@@ -520,7 +520,7 @@ t_sku_month = table(["Month", "SKU", "Signups", "Mix", "Signup → paid", "Payin
 t_fin = table(["Close month", "Paying customers", "All closed opps (incl. $0)", "New deal value"],
               [[m, f0(p), f0(a), "$" + f0(mr)] for m, p, a, mr in fin])
 
-WIN_SQL = "-- ANALYSIS BASE" + Path("sql/01_clean.sql").read_text().split("-- ANALYSIS BASE")[1]
+WIN_SQL = "-- STEP 4." + Path("sql/01_clean.sql").read_text().split("-- STEP 4.")[1]
 
 # ------------------------------------------------------------------ page
 page = f"""<!doctype html>
