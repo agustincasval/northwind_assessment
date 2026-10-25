@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup, Comment
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "build" / "gdocs"; OUT.mkdir(exist_ok=True)
-PAGES = "https://bald-phoenix.github.io/northwind_assessment"
-REPO = "https://github.com/bald-phoenix/northwind_assessment"
+PAGES = "https://northwind-acv.github.io/plg-conversion-panel"
+REPO = "https://github.com/northwind-acv/plg-conversion-panel"
 METH_URL = sys.argv[1] if len(sys.argv) > 1 else f"{PAGES}/data-methodology.html"
 IMG = {"c0t": "weekly_signups_conversion", "c1t": "signups_by_sku", "c3t": "conversion_by_sku",
        "c4t": "decomposition_waterfall", "c5t": "conversion_by_slice"}

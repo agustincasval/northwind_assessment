@@ -209,7 +209,7 @@ page = f"""<!doctype html>
 <p class="note-foot">Counts include $0 deals. Prices didn't change during the period, so this is a packaging change, not a pricing change.</p>
 
 <h2>3. Cleaning rules</h2>
-<p>Each rule is numbered in <a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a> with the same id. Rows are flagged rather than dropped when they're still useful for some cuts.</p>
+<p>Each rule is numbered in <a href="https://github.com/northwind-acv/plg-conversion-panel/blob/main/sql/01_clean.sql">01_clean.sql</a> with the same id. Rows are flagged rather than dropped when they're still useful for some cuts.</p>
 {t_rules}
 
 <h3>Checking R7: were the July dates really wrong?</h3>

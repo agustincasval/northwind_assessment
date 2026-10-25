@@ -698,7 +698,7 @@ sup a {{ text-decoration:none; }}
   {ch_water}
   {legend([("Increase", "--pos"), ("Decrease", "--neg"), ("Total", "--ink-total")])}
 </figure>
-<p class="note-foot">Assumption: Free CRM didn't exist in Q1, so it has no Q1 conversion rate. We use its Q2 rate for both periods, which puts its whole effect in mix. Query: <a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>.</p>
+<p class="note-foot">Assumption: Free CRM didn't exist in Q1, so it has no Q1 conversion rate. We use its Q2 rate for both periods, which puts its whole effect in mix. Query: <a href="https://github.com/northwind-acv/plg-conversion-panel/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>.</p>
 
 <h3>4. The drop is the same for every type of signup</h3>
 <figure>
@@ -752,11 +752,11 @@ sup a {{ text-decoration:none; }}
 <p class="note-foot">July closes come from June signups (the opportunity extract runs to Jul 26). Includes 15 opportunities whose lead_id doesn't match any signup.</p>
 
 <h2 id="appendix-d">Appendix D — Queries</h2>
-<p>Every number in this document comes from three SQL files in the <a href="https://github.com/bald-phoenix/northwind_assessment">project repo</a>. How the data was validated and cleaned is in <a href="data-methodology.html">Data methodology</a>.</p>
+<p>Every number in this document comes from three SQL files in the <a href="https://github.com/northwind-acv/plg-conversion-panel">project repo</a>. How the data was validated and cleaned is in <a href="data-methodology.html">Data methodology</a>.</p>
 <ul>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/01_clean.sql">01_clean.sql</a>: cleaning rules and the analysis base table</li>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/02_funnel.sql">02_funnel.sql</a>: weekly and monthly funnel, SKU split, slices, finance view</li>
-  <li><a href="https://github.com/bald-phoenix/northwind_assessment/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>: decomposition</li>
+  <li><a href="https://github.com/northwind-acv/plg-conversion-panel/blob/main/sql/01_clean.sql">01_clean.sql</a>: cleaning rules and the analysis base table</li>
+  <li><a href="https://github.com/northwind-acv/plg-conversion-panel/blob/main/sql/02_funnel.sql">02_funnel.sql</a>: weekly and monthly funnel, SKU split, slices, finance view</li>
+  <li><a href="https://github.com/northwind-acv/plg-conversion-panel/blob/main/sql/03_decomposition.sql">03_decomposition.sql</a>: decomposition</li>
 </ul>
 </main>
 <div id="tip" role="tooltip"></div>

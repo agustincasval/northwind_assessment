@@ -120,7 +120,7 @@ for s in doc.sections:
 doc.add_heading("Northwind CRM — Queries", 0)
 doc.add_paragraph("Snowflake SQL. The same files also run unchanged in DuckDB on a laptop. Run them in order: "
                   "00 (local only), 01, 02, 03. Source tables in Snowflake: sessions, signups, opportunities. "
-                  "Repo: github.com/bald-phoenix/northwind_assessment")
+                  "Repo: github.com/northwind-acv/plg-conversion-panel")
 doc.add_heading("What we had to fix so the data is usable", 1)
 doc.add_paragraph("All fixes happen in 01_clean.sql; 02 and 03 only read the clean tables. "
                   "Rule ids match the comments in the code and the Data methodology doc.")
