@@ -1,9 +1,5 @@
--- =====================================================================
--- 00_load_raw.sql  —  LOCAL ONLY (DuckDB)
--- In Snowflake, skip this file: sessions, signups and opportunities
--- already exist as tables. Locally, this creates them from the CSVs.
--- Run from the folder that contains the data/ subfolder.
--- =====================================================================
+-- 00_load_raw.sql
+-- Only needed locally in DuckDB. In Snowflake the tables already exist, skip this.
 
 CREATE OR REPLACE TABLE sessions      AS SELECT * FROM read_csv_auto('data/sessions.csv');
 CREATE OR REPLACE TABLE signups       AS SELECT * FROM read_csv_auto('data/signups.csv');

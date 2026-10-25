@@ -1,44 +1,30 @@
--- =====================================================================
--- 01_clean.sql — Clean the three raw tables and join them
--- Snowflake SQL (also runs in DuckDB). Rule ids R1–R14 match the
--- Data methodology doc. Flags are 1/0 so they can be summed and averaged.
+-- 01_clean.sql
+-- Cleans sessions, signups and opportunities and joins them into signup_outcomes.
 --
--- WHAT WE HAD TO FIX SO THE DATA IS USABLE
--- (applied in 01_clean.sql; 02 and 03 only read the cleaned tables)
---
--- | Rule | Table         | Problem found                               | What we did                         | Rows   |
--- |------|---------------|---------------------------------------------|-------------------------------------|--------|
--- | R1   | sessions      | Same channel written 12 ways ("direct ")    | Map to 7 channel names              | 1,284  |
--- | R2   | sessions      | 135 URL spellings of ~20 pages              | Clean URL, group into 7 page types  | all    |
--- | R3   | sessions      | Visit with no visitor id                    | Keep, mark is_visitor_missing       | 300    |
--- | R4   | signups       | Exact duplicate rows                        | Remove                              | 66     |
--- | R5   | signups       | Fake company sizes (-5, 999,999)            | Set to unknown                      | 30     |
--- | R6   | signups       | Same lead twice with different details      | Keep the most complete row          | 4 leads|
--- | R7   | signups       | Signup dated July, after the data ends      | Use the date of its visit           | 8      |
--- | R8   | signups       | Points to a visit that doesn't exist        | Keep, mark is_session_orphan        | 25     |
--- | R9   | opportunities | Exact duplicate rows                        | Remove                              | 18     |
--- | R10  | opportunities | Amount 1,000x the price (35,000 / 110,000)  | Divide by 1,000                     | 6      |
--- | R11  | opportunities | $0 deals (nobody pays)                      | Keep, mark is_zero_amount; not wins | 30     |
--- | R12  | opportunities | Negative days_to_close (sign bug)           | Recompute from the dates            | 10     |
--- | R13  | opportunities | Points to a lead that doesn't exist         | Keep, mark is_lead_orphan           | 15     |
--- | R14  | signups       | Country written as the text 'N/A'           | Set to unknown                      | 25     |
---
--- =====================================================================
+-- Data fixes:
+-- R1   sessions       channel written 12 ways             -> standardized to 7 channels    (1,284 rows)
+-- R2   sessions       135 versions of ~20 URLs            -> cleaned, grouped in 7 types   (all rows)
+-- R3   sessions       missing visitor_id                  -> kept, flagged                 (300)
+-- R4   signups        exact duplicates                    -> removed                       (66)
+-- R5   signups        company_size -5 / 999,999           -> set to null                   (30)
+-- R6   signups        same lead twice                     -> kept most complete row        (4 leads)
+-- R7   signups        signup dated in July                -> replaced with session date    (8)
+-- R8   signups        session_id not in sessions          -> kept, flagged                 (25)
+-- R9   opportunities  exact duplicates                    -> removed                       (18)
+-- R10  opportunities  amount 35,000 / 110,000             -> divided by 1,000              (6)
+-- R11  opportunities  $0 deals                            -> flagged, not counted as wins  (30)
+-- R12  opportunities  negative days_to_close              -> recalculated from dates       (10)
+-- R13  opportunities  lead_id not in signups              -> kept, flagged                 (15)
+-- R14  signups        geo = 'N/A'                         -> set to null                   (25)
 
 
--- ---------------------------------------------------------------------
--- STEP 1. sessions_clean — one row per website visit
--- ---------------------------------------------------------------------
+-- Sessions --------------------------------------------------------------
+
 CREATE OR REPLACE TABLE sessions_clean AS
-WITH with_clean_url AS (
+WITH urls AS (
     SELECT
         s.*,
-        -- R2. Make the URL comparable. Read it inside-out:
-        --   1) cut everything after "?"         /pricing?plan=starter -> /pricing
-        --   2) lowercase                        /HOME -> /home
-        --   3) drop the country prefix          /uk/blog/x -> /blog/x
-        --   4) drop the trailing slash          /pricing/ -> /pricing
-        --   5) if nothing is left, it was "/"   (the home page)
+        -- R2: Did this to clean up the url (no query string, country prefix or trailing slash)
         COALESCE(
             NULLIF(
                 REGEXP_REPLACE(
@@ -53,8 +39,7 @@ SELECT
     session_id,
     visitor_id,
     CAST(event_dt AS DATE) AS event_dt,
-
-    -- R1. Same channel written different ways ("Display ", "direct") -> one name
+    -- R1: Standardized the channel names
     CASE LOWER(TRIM(mktg_channel))
         WHEN 'direct'         THEN 'Direct'
         WHEN 'display'        THEN 'Display'
@@ -64,12 +49,10 @@ SELECT
         WHEN 'referral'       THEN 'Referral'
         WHEN 'social'         THEN 'Social'
     END AS mktg_channel,
-
     geo,
     device_type,
     entry_url,
-
-    -- R2. Group the clean URL into 7 page types
+    -- R2: Grouped the urls into page types
     CASE
         WHEN url_clean LIKE '/blog%'    OR url_clean LIKE '/resources%' THEN 'content'
         WHEN url_clean IN ('/', '/home', '/index')                      THEN 'home'
@@ -80,23 +63,18 @@ SELECT
         WHEN url_clean LIKE '/product%' OR url_clean LIKE '/features%'  THEN 'product'
         ELSE 'other'
     END AS page_type,
-
     converted_flag,
-
-    -- R3. 300 visits have no visitor id. Keep them, just mark them.
-    CASE WHEN visitor_id IS NULL THEN 1 ELSE 0 END AS is_visitor_missing
-FROM with_clean_url;
+    CASE WHEN visitor_id IS NULL THEN 1 ELSE 0 END AS is_visitor_missing   -- R3
+FROM urls;
 
 
--- ---------------------------------------------------------------------
--- STEP 2. signups_clean — one row per lead
--- ---------------------------------------------------------------------
+-- Signups ---------------------------------------------------------------
+
 CREATE OR REPLACE TABLE signups_clean AS
-WITH no_duplicates AS (
-    -- R4. Remove rows that are exact copies of another row
-    SELECT DISTINCT * FROM signups
+WITH dedup AS (
+    SELECT DISTINCT * FROM signups                                          -- R4
 ),
-fixed_values AS (
+fixed AS (
     SELECT
         lead_id,
         visitor_id,
@@ -104,39 +82,31 @@ fixed_values AS (
         CAST(created_dt AS DATE) AS created_dt,
         mktg_channel,
         product_code,
-        -- R14. The text 'N/A' is not a country -> treat it as unknown
-        NULLIF(TRIM(geo), 'N/A') AS geo,
-        -- R5. -5 or 999,999 employees are not real -> treat as unknown
-        CASE WHEN company_size < 1 OR company_size >= 999999 THEN NULL
+        NULLIF(TRIM(geo), 'N/A') AS geo,                                    -- R14
+        CASE WHEN company_size < 1 OR company_size >= 999999 THEN NULL      -- R5
              ELSE company_size END AS company_size
-    FROM no_duplicates
+    FROM dedup
 ),
 ranked AS (
-    -- R6. A few leads appear twice with different details.
-    -- Score each row by how complete it is (0, 1 or 2 known fields)
-    -- and number the rows of each lead from most to least complete.
+    -- R6: Some leads show up twice, kept the row with more fields filled in
     SELECT
         f.*,
         ROW_NUMBER() OVER (
             PARTITION BY lead_id
             ORDER BY (CASE WHEN geo IS NOT NULL THEN 1 ELSE 0 END)
                    + (CASE WHEN company_size IS NOT NULL THEN 1 ELSE 0 END) DESC
-        ) AS row_rank
-    FROM fixed_values f
+        ) AS rn
+    FROM fixed f
 )
 SELECT
     r.lead_id,
     r.visitor_id,
     r.session_id,
-
-    -- R7. 8 signups are dated in July, after the data ends. Every signup
-    -- happens on the same day as its visit, so use the visit date instead.
+    -- R7: A few signups are dated in July, used the session date instead
     CASE WHEN r.created_dt > DATE '2026-06-30' AND s.event_dt IS NOT NULL
-         THEN s.event_dt
-         ELSE r.created_dt END AS created_dt,
+         THEN s.event_dt ELSE r.created_dt END AS created_dt,
     CASE WHEN r.created_dt > DATE '2026-06-30' AND s.event_dt IS NOT NULL
          THEN 1 ELSE 0 END AS is_date_fixed,
-
     r.mktg_channel,
     r.product_code,
     CASE r.product_code
@@ -146,74 +116,49 @@ SELECT
     END AS product,
     r.geo,
     r.company_size,
-
-    -- R8. 25 signups point to a visit that doesn't exist (broken id).
-    -- Keep them, just mark them.
-    CASE WHEN s.session_id IS NULL THEN 1 ELSE 0 END AS is_session_orphan
+    CASE WHEN s.session_id IS NULL THEN 1 ELSE 0 END AS is_session_orphan  -- R8
 FROM ranked r
-LEFT JOIN sessions_clean s
-       ON s.session_id = r.session_id
-WHERE r.row_rank = 1;          -- keep only the most complete row per lead
+LEFT JOIN sessions_clean s ON s.session_id = r.session_id
+WHERE r.rn = 1;
 
 
--- ---------------------------------------------------------------------
--- STEP 3. opportunities_clean — one row per closed deal
--- ---------------------------------------------------------------------
+-- Opportunities ---------------------------------------------------------
+
 CREATE OR REPLACE TABLE opportunities_clean AS
-WITH no_duplicates AS (
-    -- R9. Remove rows that are exact copies of another row
-    SELECT DISTINCT * FROM opportunities
+WITH dedup AS (
+    SELECT DISTINCT * FROM opportunities                                    -- R9
 )
 SELECT
     o.opp_id,
     o.lead_id,
     CAST(o.close_dt AS DATE) AS close_dt,
     o.plan,
-
-    -- R10. 35,000 and 110,000 are the list prices x1000 (unit error)
-    CASE WHEN o.amount IN (35000, 110000) THEN o.amount / 1000
+    CASE WHEN o.amount IN (35000, 110000) THEN o.amount / 1000              -- R10
          ELSE o.amount END AS amount,
-
-    -- R11. $0 deals closed but nobody pays -> not a paying customer
-    CASE WHEN o.amount = 0 THEN 1 ELSE 0 END AS is_zero_amount,
-
-    -- R12. Some days_to_close are negative (sign bug).
-    -- Recompute from the dates; if the lead is missing, flip the sign.
-    COALESCE(CAST(o.close_dt AS DATE) - g.created_dt,
-             ABS(o.days_to_close)) AS days_to_close,
-
-    -- R13. 15 deals point to a lead that doesn't exist (broken id).
-    -- Keep them, just mark them.
-    CASE WHEN g.lead_id IS NULL THEN 1 ELSE 0 END AS is_lead_orphan
-FROM no_duplicates o
-LEFT JOIN signups_clean g
-       ON g.lead_id = o.lead_id;
+    CASE WHEN o.amount = 0 THEN 1 ELSE 0 END AS is_zero_amount,             -- R11
+    -- R12: Recalculated days to close from the dates (abs() when the lead is missing)
+    COALESCE(CAST(o.close_dt AS DATE) - g.created_dt, ABS(o.days_to_close)) AS days_to_close,
+    CASE WHEN g.lead_id IS NULL THEN 1 ELSE 0 END AS is_lead_orphan        -- R13
+FROM dedup o
+LEFT JOIN signups_clean g ON g.lead_id = o.lead_id;
 
 
--- ---------------------------------------------------------------------
--- STEP 4. signup_outcomes — one row per signup, everything we need
--- to analyze it: where it came from, which SKU, and did it pay
--- ---------------------------------------------------------------------
+-- Signup outcomes: one row per signup, used by every metric ---------------
+
 CREATE OR REPLACE TABLE signup_outcomes AS
 WITH first_visit AS (
-    -- The first day each visitor came to the site
     SELECT visitor_id, MIN(event_dt) AS first_visit_dt
     FROM sessions_clean
     WHERE visitor_id IS NOT NULL
     GROUP BY visitor_id
 ),
 paid_deals AS (
-    -- Only deals where someone actually pays
     SELECT * FROM opportunities_clean WHERE is_zero_amount = 0
 )
 SELECT
     g.*,
-
-    -- Cohort = the month the lead signed up
     CAST(DATE_TRUNC('month', g.created_dt) AS DATE) AS signup_month,
     CASE WHEN g.created_dt < DATE '2026-04-01' THEN 'Q1' ELSE 'Q2' END AS period,
-
-    -- Where the signup came from (its visit)
     s.device_type,
     s.page_type,
     CASE WHEN fv.first_visit_dt < g.created_dt THEN 'Returning' ELSE 'New' END AS visitor_type,
@@ -224,14 +169,10 @@ SELECT
         WHEN g.company_size <= 200  THEN '51-200'
         ELSE '201+'
     END AS company_size_bucket,
-
-    -- The deal it turned into, if any
     o.plan   AS won_plan,
     o.amount AS won_amount,
     o.days_to_close,
-
-    -- THE WIN DEFINITION: a paying deal closed within 30 days of signup.
-    -- 1 = paying customer, 0 = not. Summing this column counts wins.
+    -- Win = paid deal closed within 30 days of signup
     CASE WHEN o.opp_id IS NOT NULL AND o.days_to_close <= 30 THEN 1 ELSE 0 END AS is_win
 FROM signups_clean g
 LEFT JOIN sessions_clean s ON s.session_id = g.session_id
