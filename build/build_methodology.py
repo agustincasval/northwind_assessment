@@ -248,15 +248,7 @@ page = f"""<!doctype html>
 </ul>
 
 <h2>7. Reproduce it</h2>
-<p>The queries are written in Snowflake SQL and avoid engine-specific functions, so they also run unchanged in <a href="https://duckdb.org">DuckDB</a> on a laptop. In Snowflake, run 01, 02 and 03 against the <code>sessions</code>, <code>signups</code> and <code>opportunities</code> tables. Locally, run <code>00_load_raw.sql</code> first to load the CSVs into tables with those same names. Run from the folder that contains <code>data/</code>.</p>
-<pre>duckdb northwind.duckdb &lt; sql/00_load_raw.sql
-duckdb northwind.duckdb &lt; sql/01_clean.sql
-duckdb northwind.duckdb &lt; sql/02_funnel.sql
-duckdb northwind.duckdb &lt; sql/03_decomposition.sql</pre>
-<details><summary>00_load_raw.sql — load the CSVs (local only)</summary><pre>{sqlfile('sql/00_load_raw.sql')}</pre></details>
-<details><summary>01_clean.sql — cleaning rules and analysis base table</summary><pre>{sqlfile('sql/01_clean.sql')}</pre></details>
-<details><summary>02_funnel.sql — funnel, plan split, slices, finance view</summary><pre>{sqlfile('sql/02_funnel.sql')}</pre></details>
-<details><summary>03_decomposition.sql — Kitagawa decomposition</summary><pre>{sqlfile('sql/03_decomposition.sql')}</pre></details>
+<p>The queries are written in Snowflake SQL against the <code>sessions</code>, <code>signups</code> and <code>opportunities</code> tables. Run them in order: <a href="https://github.com/northwind-acv/plg-conversion-panel/tree/main/sql">01_clean, 02_funnel, 03_decomposition</a>. To run locally in DuckDB, run <code>00_load_raw.sql</code> first to load the CSVs.</p>
 </main>
 </body>
 </html>
